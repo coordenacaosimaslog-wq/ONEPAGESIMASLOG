@@ -1,0 +1,441 @@
+/* Safety Cross Styles */
+.safety-cross-wrapper {
+    background-color: #0f1a36;
+    /* Simas Dark Navy */
+    /* Remove padding/border-radius here if handled inline, but good to keep as fallback */
+    padding: 2rem;
+    border-radius: 8px;
+    color: white;
+    position: relative;
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.safety-cross-header {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+#safetyCrossGrid {
+    display: grid;
+    grid-template-columns: repeat(6, 45px);
+    gap: 2px;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.cross-cell {
+    width: 45px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    /* Bold numbers */
+    font-size: 1rem;
+    color: black;
+    background: white;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.1s;
+    /* Yellow Border is key to the design */
+    border: 2px solid #fff59d;
+    /* Amber-400 or similar yellow */
+}
+
+.cross-cell:hover {
+    filter: brightness(0.95);
+    transform: scale(1.05);
+    z-index: 10;
+}
+
+.cross-cell.empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* States */
+.cross-cell[data-status="ok"],
+.cross-cell.status-ok {
+    background-color: #4d7c0f;
+    /* Green */
+    color: white;
+    border-color: #fff59d;
+}
+
+.cross-cell[data-status="nok"],
+.cross-cell.status-nok {
+    background-color: #ef4444;
+    /* Red */
+    color: white;
+    border-color: #fff59d;
+}
+
+@media (max-width: 768px) {
+    #safetyCrossGrid {
+        grid-template-columns: repeat(6, 1fr);
+        width: 100%;
+        max-width: 320px;
+        gap: 1px;
+    }
+
+    .cross-cell {
+        width: 100%;
+        height: 35px;
+        font-size: 0.8rem;
+    }
+}
+
+/* --- New Visual Layout Integration --- */
+.safety-visuals-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: stretch;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 900px) {
+    .safety-visuals-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.safety-cross-wrapper {
+    /* Reset margins for grid context */
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+    height: 100%;
+}
+
+/* --- Bird Pyramid Styles --- */
+/* --- Bird Pyramid Styles --- */
+.bird-pyramid-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    height: 100%;
+}
+
+.pyramid-title {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #0f1a36;
+    margin-bottom: 2rem;
+    width: 100%;
+    text-align: center;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    text-transform: uppercase;
+}
+
+.pyramid-content-wrapper {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+    flex-grow: 1;
+}
+
+/* --- Structural Side Key (Brackets) --- */
+.pyramid-key-left {
+    width: 80px;
+    display: flex;
+    flex-direction: column;
+    margin-right: 15px;
+}
+
+.key-bracket-section {
+    flex: 1;
+    /* Each takes half the height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* The continuous bracket line */
+.key-bracket-section::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 5px;
+    bottom: 5px;
+    width: 15px;
+    border: 3px solid currentColor;
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    opacity: 0.8;
+}
+
+.key-bracket-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    text-transform: uppercase;
+    font-weight: 900;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    padding: 10px 0;
+}
+
+.key-bracket-section.reactive {
+    color: #dc2626;
+    background: linear-gradient(to right, rgba(254, 242, 242, 0.5), transparent);
+}
+
+.key-bracket-section.preventive {
+    color: #16a34a;
+    background: linear-gradient(to right, rgba(240, 253, 244, 0.5), transparent);
+}
+
+/* Unified Rows Container */
+.pyramid-rows-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: space-around;
+    padding: 1rem 0;
+}
+
+.p-row {
+    display: flex;
+    align-items: center;
+    height: 45px;
+}
+
+.p-spacer-left {
+    flex: 1;
+    /* Pushes pyramid towards center but allows lines to exit */
+    min-width: 5px;
+}
+
+.pyramid-level {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 900;
+    font-size: 1.1rem;
+    height: 100%;
+    position: relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    z-index: 2;
+}
+
+/* Specific Level Visuals */
+.pl-1 {
+    width: 40px;
+    background: linear-gradient(180deg, #ef4444, #b91c1c);
+    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    padding-top: 5px;
+    font-size: 0.8rem;
+}
+
+.pl-2 {
+    width: 80px;
+    background: linear-gradient(180deg, #f97316, #c2410c);
+    clip-path: polygon(15% 0, 85% 0, 100% 100%, 0% 100%);
+}
+
+.pl-3 {
+    width: 120px;
+    background: linear-gradient(180deg, #eab308, #a16207);
+    clip-path: polygon(10% 0, 90% 0, 100% 100%, 0% 100%);
+}
+
+.pl-4 {
+    width: 160px;
+    background: linear-gradient(180deg, #84cc16, #4d7c0f);
+    clip-path: polygon(7% 0, 93% 0, 100% 100%, 0% 100%);
+}
+
+.pl-5 {
+    width: 200px;
+    background: linear-gradient(180deg, #22c55e, #15803d);
+    clip-path: polygon(5% 0, 95% 0, 100% 100%, 0% 100%);
+}
+
+.pl-6 {
+    width: 240px;
+    background: linear-gradient(180deg, #10b981, #047857);
+    clip-path: polygon(4% 0, 96% 0, 100% 100%, 0% 100%);
+}
+
+.dotted-line {
+    flex: 1;
+    height: 10px;
+    background-size: 12px 100%;
+    background-repeat: repeat-x;
+    background-position: left center;
+    margin: 0 10px;
+    border: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* The terminal circle node color now dynamically matches the level */
+.dotted-line::after {
+    content: "";
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 50%;
+    margin-right: -6px;
+    box-shadow: 0 0 0 3px white;
+    flex-shrink: 0;
+    z-index: 5;
+    border: 2.5px solid currentColor;
+}
+
+/* Level Specific Colors for Lines and Nodes */
+.p-row:nth-child(1) .dotted-line {
+    color: #ef4444;
+    background-image: radial-gradient(circle, #ef4444 1.5px, transparent 1.5px);
+}
+
+.p-row:nth-child(2) .dotted-line {
+    color: #f97316;
+    background-image: radial-gradient(circle, #f97316 1.5px, transparent 1.5px);
+}
+
+.p-row:nth-child(3) .dotted-line {
+    color: #eab308;
+    background-image: radial-gradient(circle, #eab308 1.5px, transparent 1.5px);
+}
+
+.p-row:nth-child(4) .dotted-line {
+    color: #84cc16;
+    background-image: radial-gradient(circle, #84cc16 1.5px, transparent 1.5px);
+}
+
+.p-row:nth-child(5) .dotted-line {
+    color: #22c55e;
+    background-image: radial-gradient(circle, #22c55e 1.5px, transparent 1.5px);
+}
+
+.p-row:nth-child(6) .dotted-line {
+    color: #10b981;
+    background-image: radial-gradient(circle, #10b981 1.5px, transparent 1.5px);
+}
+
+/* --- Safety Image Cards --- */
+.safety-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    width: 100%;
+}
+
+.safety-upload-card {
+    aspect-ratio: 4/3;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    background: #f8fafc;
+    transition: all 0.2s;
+}
+
+.safety-upload-card:hover {
+    border-color: #1e3a8a;
+    background: #f1f5f9;
+}
+
+.upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.upload-placeholder i {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+}
+
+.image-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    cursor: zoom-in;
+}
+
+/* --- Lightbox Modal --- */
+.lightbox-overlay {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    cursor: pointer;
+    animation: fadeIn 0.3s;
+}
+
+.lightbox-content {
+    margin: auto;
+    display: block;
+    max-width: 90%;
+    max-height: 85%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    border: 3px solid white;
+    border-radius: 4px;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: white;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.p-label-text {
+    width: 150px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #334155;
+    text-transform: uppercase;
+    text-align: left;
+    line-height: 1;
+    padding-left: 6px;
+}
