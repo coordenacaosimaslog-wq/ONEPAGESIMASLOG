@@ -1443,7 +1443,12 @@
             <div class="licenses-card">
                 <div class="licenses-header">
                     <div class="licenses-title-group">
-                        <h3 class="licenses-title">Licenças a Vencer</h3>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <h3 class="licenses-title">Licenças a Vencer</h3>
+                            <button class="btn-sys" onclick="ReportApp.addLicense()" style="padding: 4px 12px; font-size: 0.7rem; border-radius: 4px;">
+                                <i class="fas fa-plus"></i> NOVA
+                            </button>
+                        </div>
                         <p class="licenses-subtitle">Monitoramento de Conformidade Regulatória</p>
                     </div>
                     <div class="licenses-badges">
@@ -1472,7 +1477,7 @@
                                 <th style="width: 20%; text-align: center;">Status</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="licenses_tbody">
                             <tr>
                                 <td>
                                     <div class="lic-name-cell">
@@ -3581,6 +3586,18 @@
     <div id="lightboxModal" class="lightbox-overlay" onclick="ReportApp.closeLightbox()">
         <span class="lightbox-close">&times;</span>
         <img class="lightbox-content" id="lightboxImg">
+        
+        <div id="lightboxLupContainer" style="display:none; width:90%; height:90%; margin:auto; flex-direction:row; gap:20px; align-items:center; justify-content:center;">
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:center; width: 100%;">
+                <h3 style="color:white; margin-bottom:10px; text-shadow: 1px 1px 3px black;">DESVIO</h3>
+                <img id="lightboxLupDesvio" style="width:100%; height:75vh; object-fit:contain; border: 3px solid #e3382c; border-radius: 8px; background: rgba(0,0,0,0.2);">
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:center; width: 100%;">
+                <h3 style="color:white; margin-bottom:10px; text-shadow: 1px 1px 3px black;">PADRÃO</h3>
+                <img id="lightboxLupPadrao" style="width:100%; height:75vh; object-fit:contain; border: 3px solid #10b981; border-radius: 8px; background: rgba(0,0,0,0.2);">
+            </div>
+        </div>
+
         <div id="lightboxCaption"></div>
     </div>
 

@@ -342,17 +342,53 @@ const ReportApp = {
 
             // 1.1 Licenses
             const licenses = opData.licenses || Array(4).fill({ name: '', date: '', status: 'regular' });
-            licenses.forEach((lic, idx) => {
-                this.safeSet(`lic_name_${idx}`, lic.name || '');
-                this.safeSet(`lic_date_${idx}`, lic.date || '');
-                this.safeSet(`lic_status_${idx}`, lic.status || 'regular');
-                const sel = document.getElementById(`lic_status_${idx}`);
-                if (sel && typeof updateRowStatusColor === 'function') updateRowStatusColor(sel);
-            });
-            const badges = opData.licenseBadges || { critical: '2 Críticas', alert: '1 Alerta', regular: '5 Regulares' };
-            this.safeSet('lic_badge_critical', badges.critical);
-            this.safeSet('lic_badge_alert', badges.alert);
-            this.safeSet('lic_badge_regular', badges.regular);
+            const licTbody = document.getElementById('licenses_tbody');
+            if (licTbody) {
+                licTbody.innerHTML = '';
+                licenses.forEach((lic, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            <div class="lic-name-cell">
+                                <i class="fas fa-file-alt"></i>
+                                <input type="text" id="lic_name_${idx}" value="${lic.name || ''}" placeholder="Nome da licença ou órgão...">
+                            </div>
+                        </td>
+                        <td>
+                            <input type="date" id="lic_date_${idx}" value="${lic.date || ''}" style="text-align: center; font-weight: 600;">
+                        </td>
+                        <td style="position: relative;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div class="status-badge-wrapper">
+                                    <i class="fas fa-check-circle status-badge-icon"></i>
+                                    <select id="lic_status_${idx}" onchange="updateRowStatusColor(this)">
+                                        <option value="regular" ${lic.status==='regular'?'selected':''}>Regular</option>
+                                        <option value="alert" ${lic.status==='alert'?'selected':''}>Alerta</option>
+                                        <option value="critical" ${lic.status==='critical'?'selected':''}>Crítica</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down status-badge-chevron"></i>
+                                </div>
+                                <button onclick="ReportApp.removeLicense(${idx})" style="background:transparent; border:none; color:#dc2626; cursor:pointer;" title="Remover"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </td>
+                    `;
+                    licTbody.appendChild(tr);
+                    const sel = document.getElementById(`lic_status_${idx}`);
+                    if (sel && typeof updateRowStatusColor === 'function') updateRowStatusColor(sel);
+                });
+            } else {
+                licenses.forEach((lic, idx) => {
+                    this.safeSet(`lic_name_${idx}`, lic.name || '');
+                    this.safeSet(`lic_date_${idx}`, lic.date || '');
+                    this.safeSet(`lic_status_${idx}`, lic.status || 'regular');
+                    const sel = document.getElementById(`lic_status_${idx}`);
+                    if (sel && typeof updateRowStatusColor === 'function') updateRowStatusColor(sel);
+                });
+            }
+            // Badges are auto-calculated by updateLicenseBadges
+            if (typeof updateLicenseBadges === 'function') {
+                updateLicenseBadges();
+            }
 
             // 2. Safety Section
             const sd = opData.safety || this.defaultTemplate.safety;
@@ -706,6 +742,29 @@ const ReportApp = {
         const opGlobal = this.data[this.currentOp].global;
         if (opGlobal && opGlobal.forklifts && opGlobal.forklifts.length > 0) {
             opGlobal.forklifts.splice(index, 1);
+            this.saveData(true);
+            this.render();
+        }
+    },
+
+    addLicense: function() {
+        if (!this.data[this.currentOp]) {
+            this.data[this.currentOp] = { global: JSON.parse(JSON.stringify(this.defaultTemplate)), daily: {}, monthly: {} };
+        }
+        const opGlobal = this.data[this.currentOp].global;
+        if (!opGlobal.licenses) {
+            opGlobal.licenses = Array(4).fill({ name: '', date: '', status: 'regular' });
+        }
+        opGlobal.licenses.push({ name: '', date: '', status: 'regular' });
+        this.saveData(true);
+        this.render();
+    },
+
+    removeLicense: function(index) {
+        if (!confirm('Deseja realmente remover esta licença?')) return;
+        const opGlobal = this.data[this.currentOp].global;
+        if (opGlobal && opGlobal.licenses) {
+            opGlobal.licenses.splice(index, 1);
             this.saveData(true);
             this.render();
         }
@@ -1801,18 +1860,17 @@ const ReportApp = {
         global.area = document.getElementById('areaName').value;
         global.version = document.getElementById('reportVersion').value;
 
-        for (let i = 0; i < 4; i++) {
+        global.licenses = (global.licenses || []).map((lic, i) => {
             const nameEl = document.getElementById(`lic_name_${i}`);
+            if (!nameEl) return lic; // Preserva licenças recém-adicionadas que ainda não foram renderizadas
             const dateEl = document.getElementById(`lic_date_${i}`);
             const statusEl = document.getElementById(`lic_status_${i}`);
-            if (nameEl && dateEl) {
-                global.licenses[i] = {
-                    name: nameEl.value,
-                    date: dateEl.value,
-                    status: statusEl ? statusEl.value : 'regular'
-                };
-            }
-        }
+            return {
+                name: nameEl.value,
+                date: dateEl ? dateEl.value : lic.date,
+                status: statusEl ? statusEl.value : lic.status
+            };
+        });
         global.licenseBadges = {
             critical: document.getElementById('lic_badge_critical')?.value || '2 Críticas',
             alert: document.getElementById('lic_badge_alert')?.value || '1 Alerta',
@@ -2173,9 +2231,75 @@ const ReportApp = {
         if (!imgSrc) return;
 
         const modal = document.getElementById('lightboxModal');
-        const img = document.getElementById('lightboxImg');
+        const singleImg = document.getElementById('lightboxImg');
+        const lupContainer = document.getElementById('lightboxLupContainer');
+        if (lupContainer) lupContainer.style.display = 'none';
+        singleImg.style.display = 'block';
+
         modal.style.display = 'block';
-        img.src = imgSrc;
+        singleImg.src = imgSrc;
+    },
+
+    openLightboxSrc: function (src) {
+        if (!src) return;
+        const modal = document.getElementById('lightboxModal');
+        const singleImg = document.getElementById('lightboxImg');
+        const lupContainer = document.getElementById('lightboxLupContainer');
+        if (lupContainer) lupContainer.style.display = 'none';
+        singleImg.style.display = 'block';
+
+        modal.style.display = 'block';
+        singleImg.src = src;
+    },
+
+    openLightboxLup: function (index) {
+        const opData = this.getDataForOp(this.currentOp);
+        if (!opData || !opData.lups || !opData.lups[index]) return;
+        const lup = opData.lups[index];
+        if (!lup.imgErrado && !lup.imgCerto) return;
+
+        const modal = document.getElementById('lightboxModal');
+        const singleImg = document.getElementById('lightboxImg');
+        const lupContainer = document.getElementById('lightboxLupContainer');
+        const imgDesvio = document.getElementById('lightboxLupDesvio');
+        const imgPadrao = document.getElementById('lightboxLupPadrao');
+
+        document.querySelector('#lightboxLupContainer > div:nth-child(1) h3').innerText = 'DESVIO';
+        document.querySelector('#lightboxLupContainer > div:nth-child(2) h3').innerText = 'PADRÃO';
+
+        singleImg.style.display = 'none';
+        lupContainer.style.display = 'flex';
+
+        imgDesvio.src = lup.imgErrado || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+        imgPadrao.src = lup.imgCerto || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+
+        modal.style.display = 'block';
+    },
+
+    openLightboxMelhoria: function (index) {
+        const op = this.data[this.currentOp];
+        const dateYMD = this.currentDateYMD;
+        if (!op || !op.daily[dateYMD] || !op.daily[dateYMD].melhorias || !op.daily[dateYMD].melhorias[index]) return;
+        
+        const m = op.daily[dateYMD].melhorias[index];
+        if (!m.imgAntes && !m.imgDepois) return;
+
+        const modal = document.getElementById('lightboxModal');
+        const singleImg = document.getElementById('lightboxImg');
+        const lupContainer = document.getElementById('lightboxLupContainer');
+        const imgDesvio = document.getElementById('lightboxLupDesvio');
+        const imgPadrao = document.getElementById('lightboxLupPadrao');
+
+        document.querySelector('#lightboxLupContainer > div:nth-child(1) h3').innerText = 'ANTES';
+        document.querySelector('#lightboxLupContainer > div:nth-child(2) h3').innerText = 'DEPOIS';
+
+        singleImg.style.display = 'none';
+        lupContainer.style.display = 'flex';
+
+        imgDesvio.src = m.imgAntes || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+        imgPadrao.src = m.imgDepois || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+
+        modal.style.display = 'block';
     },
 
     closeLightbox: function () {
@@ -2415,8 +2539,8 @@ const ReportApp = {
             const color = `hsl(${hue}, 80%, 45%)`;
 
             // SVG Path for Male/Female
-            const malePath = "M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9 7h-6v13h-2v-6h-2v6H9V9H3V7h18v2z";
-            const femalePath = "M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm7 8c0-1.1-.9-2-2-2H7c-1.1 0-2 .9-2 2l2.25 9H9v3h2v-3h2v3h2v-3h1.75L19 10z";
+            const malePath = "M14 7h-4c-1.1 0-2 .9-2 2v6h2.5v7h3v-7H16V9c0-1.1-.9-2-2-2zM12 6c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z";
+            const femalePath = "M13.94 8.31C13.62 7.52 12.85 7 12 7s-1.62.52-1.94 1.31L7 16h3v6h4v-6h3l-3.06-7.69zM12 6c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z";
             const path = f.gender === 'female' ? femalePath : malePath;
 
             return `
@@ -2534,16 +2658,22 @@ const ReportApp = {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
                     <!-- Left: Desvio -->
                     <div style="background: white; border-radius: 6px; border: 1px solid #e2e8f0; border-left: 4px solid #e3382c; overflow: hidden; display: flex; flex-direction: column;">
-                        <div style="height: 180px; background: #f8fafc; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;" onclick="document.getElementById('lup_file_errado_${index}').click()">
-                            ${lup.imgErrado ? `<img src="${lup.imgErrado}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="text-align:center; color:#cbd5e1;"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.5rem; font-weight:800;">DESVIO</span></div>`}
+                        <div style="height: 180px; background: #f8fafc; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;">
+                            ${lup.imgErrado ? `
+                                <img src="${lup.imgErrado}" style="width:100%; height:100%; object-fit:cover;" onclick="document.getElementById('lup_file_errado_${index}').click()">
+                                <button onclick="event.stopPropagation(); ReportApp.openLightboxLup(${index})" style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:4px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Ampliar LUP"><i class="fas fa-search-plus"></i></button>
+                            ` : `<div style="text-align:center; color:#cbd5e1; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;" onclick="document.getElementById('lup_file_errado_${index}').click()"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.5rem; font-weight:800;">DESVIO</span></div>`}
                             <input type="file" id="lup_file_errado_${index}" style="display:none;" accept="image/*" onchange="ReportApp.handleLupImage(${index}, 'imgErrado', this)">
                         </div>
                     </div>
 
                     <!-- Right: Padrao -->
                     <div style="background: white; border-radius: 6px; border: 1px solid #e2e8f0; border-left: 4px solid #10b981; overflow: hidden; display: flex; flex-direction: column;">
-                        <div style="height: 180px; background: #f8fafc; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;" onclick="document.getElementById('lup_file_certo_${index}').click()">
-                            ${lup.imgCerto ? `<img src="${lup.imgCerto}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="text-align:center; color:#cbd5e1;"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.5rem; font-weight:800;">PADRÃO</span></div>`}
+                        <div style="height: 180px; background: #f8fafc; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative;">
+                            ${lup.imgCerto ? `
+                                <img src="${lup.imgCerto}" style="width:100%; height:100%; object-fit:cover;" onclick="document.getElementById('lup_file_certo_${index}').click()">
+                                <button onclick="event.stopPropagation(); ReportApp.openLightboxLup(${index})" style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:4px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Ampliar LUP"><i class="fas fa-search-plus"></i></button>
+                            ` : `<div style="text-align:center; color:#cbd5e1; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;" onclick="document.getElementById('lup_file_certo_${index}').click()"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.5rem; font-weight:800;">PADRÃO</span></div>`}
                             <input type="file" id="lup_file_certo_${index}" style="display:none;" accept="image/*" onchange="ReportApp.handleLupImage(${index}, 'imgCerto', this)">
                         </div>
                     </div>
@@ -2715,9 +2845,11 @@ const ReportApp = {
                         <div style="font-size: 0.7rem; font-weight: 800; color: #e3382c; text-transform: uppercase; display: flex; align-items: center; gap: 0.4rem;">
                             <i class="fas fa-times-circle"></i> SITUAÇÃO ANTERIOR (O QUE ESTAVA RUIM)
                         </div>
-                        <div style="height: 200px; background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;"
-                             onclick="document.getElementById('melhoria_file_antes_${index}').click()">
-                            ${m.imgAntes ? `<img src="${m.imgAntes}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="text-align:center; color:#cbd5e1;"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.6rem; font-weight:800; margin-top:5px; display:block;">FOTO ANTES</span></div>`}
+                        <div style="height: 200px; background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                            ${m.imgAntes ? `
+                                <img src="${m.imgAntes}" style="width:100%; height:100%; object-fit:cover;" onclick="document.getElementById('melhoria_file_antes_${index}').click()">
+                                <button onclick="event.stopPropagation(); ReportApp.openLightboxMelhoria(${index})" style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:4px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Ampliar Melhoria"><i class="fas fa-search-plus"></i></button>
+                            ` : `<div style="text-align:center; color:#cbd5e1; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;" onclick="document.getElementById('melhoria_file_antes_${index}').click()"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.6rem; font-weight:800; margin-top:5px; display:block;">FOTO ANTES</span></div>`}
                             <input type="file" id="melhoria_file_antes_${index}" style="display:none;" accept="image/*" onchange="ReportApp.handleMelhoriaImage(${index}, 'imgAntes', this)">
                         </div>
                         <textarea oninput="ReportApp.updateMelhoriaField(${index}, 'descAntes', this.value)" 
@@ -2730,9 +2862,11 @@ const ReportApp = {
                         <div style="font-size: 0.7rem; font-weight: 800; color: #10b981; text-transform: uppercase; display: flex; align-items: center; gap: 0.4rem;">
                             <i class="fas fa-check-circle"></i> MELHORIA REALIZADA (FOTO DA SOLUÇÃO)
                         </div>
-                        <div style="height: 200px; background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;"
-                             onclick="document.getElementById('melhoria_file_depois_${index}').click()">
-                            ${m.imgDepois ? `<img src="${m.imgDepois}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="text-align:center; color:#cbd5e1;"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.6rem; font-weight:800; margin-top:5px; display:block;">FOTO DEPOIS</span></div>`}
+                        <div style="height: 200px; background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                            ${m.imgDepois ? `
+                                <img src="${m.imgDepois}" style="width:100%; height:100%; object-fit:cover;" onclick="document.getElementById('melhoria_file_depois_${index}').click()">
+                                <button onclick="event.stopPropagation(); ReportApp.openLightboxMelhoria(${index})" style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:4px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Ampliar Melhoria"><i class="fas fa-search-plus"></i></button>
+                            ` : `<div style="text-align:center; color:#cbd5e1; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;" onclick="document.getElementById('melhoria_file_depois_${index}').click()"><i class="fas fa-camera fa-2x"></i><br><span style="font-size:0.6rem; font-weight:800; margin-top:5px; display:block;">FOTO DEPOIS</span></div>`}
                             <input type="file" id="melhoria_file_depois_${index}" style="display:none;" accept="image/*" onchange="ReportApp.handleMelhoriaImage(${index}, 'imgDepois', this)">
                         </div>
                         <textarea oninput="ReportApp.updateMelhoriaField(${index}, 'descDepois', this.value)" 
