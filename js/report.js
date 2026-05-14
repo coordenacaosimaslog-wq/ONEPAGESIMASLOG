@@ -198,13 +198,14 @@ const ReportApp = {
                 clearTimeout(autoSaveTimeout);
                 autoSaveTimeout = setTimeout(() => {
                     this.saveData(true);
-                }, 1000);
+                }, 5000);
             }
         });
 
         // Global Event Listeners for direct changes (selects)
         document.addEventListener('change', (e) => {
-            if (e.target.tagName === 'SELECT') {
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
                 this.saveData(true);
             }
         });
@@ -249,14 +250,17 @@ const ReportApp = {
     },
 
     saveToLocalStorage: function () {
-        if (window.firebaseDB) {
-            window.firebaseDB.ref('simas_report_data').set(this.data);
-        }
-        try {
-            localStorage.setItem('simas_report_data', JSON.stringify(this.data));
-        } catch (e) {
-            console.error("Erro ao salvar no localStorage (limite excedido?):", e);
-        }
+        // Run asynchronously to prevent UI freeze during heavy JSON stringify or Firebase ops
+        setTimeout(() => {
+            if (window.firebaseDB) {
+                window.firebaseDB.ref('simas_report_data').set(this.data);
+            }
+            try {
+                localStorage.setItem('simas_report_data', JSON.stringify(this.data));
+            } catch (e) {
+                console.error("Erro ao salvar no localStorage (limite excedido?):", e);
+            }
+        }, 10);
     },
 
     changeOperation: function (newOp) {
@@ -2119,8 +2123,15 @@ const ReportApp = {
         const op = this.data[this.currentOp];
         if (op && op.daily && op.daily[dateYMD]) {
             delete op.daily[dateYMD];
-            this.saveData(true);
+            // Save directly to storage, bypass gatherDataFromDOM so it doesn't recreate from current screen
+            this.saveToLocalStorage();
             this.renderHistoryList();
+            
+            // If the deleted date is the currently active one, refresh the screen to clear values
+            if (dateYMD === this.currentDateYMD) {
+                this.render();
+            }
+            
             alert('Histórico excluído com sucesso!');
         }
     },
@@ -2583,6 +2594,7 @@ const ReportApp = {
 
             opData.lups.forEach((lup, i) => {
                 const link = document.createElement('button');
+                link.id = `lup_nav_btn_${i}`;
                 link.onclick = () => {
                     const el = document.getElementById(`lup_card_${i}`);
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -2784,8 +2796,13 @@ const ReportApp = {
 
         op.daily[dateYMD].lups[idx][field] = val;
 
-        if (field === 'tipo' || field === 'titulo') this.renderLupCards();
-        this.saveData(true);
+        if (field === 'tipo') {
+            this.renderLupCards();
+        } else if (field === 'titulo') {
+            const btn = document.getElementById(`lup_nav_btn_${idx}`);
+            if (btn) btn.textContent = val || `LUP #${idx + 1}`;
+        }
+        // Removed synchronous this.saveData(true) to prevent UI freezing
     },
 
     handleLupImage: function (idx, field, input) {
@@ -2953,7 +2970,7 @@ const ReportApp = {
         if (!op.daily[dateYMD].melhorias) return;
 
         op.daily[dateYMD].melhorias[idx][field] = val;
-        this.saveData(true);
+        // Removed synchronous this.saveData(true) to prevent UI freezing
     },
 
     handleMelhoriaImage: function (idx, field, input) {
