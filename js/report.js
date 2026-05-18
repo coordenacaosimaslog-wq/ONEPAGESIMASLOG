@@ -250,10 +250,14 @@ const ReportApp = {
     },
 
     saveToLocalStorage: function () {
+        const opToSave = this.currentOp;
+        // Deep copy the specific operation data to avoid reference mutations during async timeout
+        const dataToSave = JSON.parse(JSON.stringify(this.data[opToSave]));
+        
         // Run asynchronously to prevent UI freeze during heavy JSON stringify or Firebase ops
         setTimeout(() => {
             if (window.firebaseDB) {
-                window.firebaseDB.ref('simas_report_data').set(this.data);
+                window.firebaseDB.ref('simas_report_data/' + opToSave).set(dataToSave);
             }
             try {
                 localStorage.setItem('simas_report_data', JSON.stringify(this.data));
@@ -264,13 +268,13 @@ const ReportApp = {
     },
 
     changeOperation: function (newOp) {
-        this.gatherDataFromDOM();
+        this.saveData(true);
         if (newOp) this.currentOp = newOp;
         this.render();
     },
 
     changeDate: function () {
-        this.gatherDataFromDOM();
+        this.saveData(true);
         this.currentDateYMD = document.getElementById('reportDatePicker').value;
 
         // Update display
@@ -398,8 +402,13 @@ const ReportApp = {
             const sd = opData.safety || this.defaultTemplate.safety;
             const now = new Date();
 
-            this.safeSet('safetyMonth', (sd.month !== undefined && sd.month !== '') ? sd.month : now.getMonth().toString());
-            this.safeSet('safetyYear', (sd.year !== undefined && sd.year !== '') ? sd.year : now.getFullYear().toString());
+            // Sync safety month/year with the current report date
+            const dateParts = this.currentDateYMD.split('-');
+            const repYear = dateParts[0];
+            const repMonth = (parseInt(dateParts[1]) - 1).toString();
+
+            this.safeSet('safetyMonth', repMonth);
+            this.safeSet('safetyYear', repYear);
             this.safeSet('safetyStatus', sd.status || 'sem_acidente');
             this.safeSet('safetyIndicator', sd.indicator || '0');
             this.safeSet('safetyRecord', sd.record || '0');
@@ -443,8 +452,17 @@ const ReportApp = {
 
             // 4. QM Section
             const qm = opData.qm || this.defaultTemplate.qm;
-            ['reclamacoes', 'solucionadas', 'nao_solucionadas', 'month', 'year'].forEach(f => {
-                this.safeSet(`qm_${f}`, qm[f] || (f === 'month' ? '0' : (f === 'year' ? '2026' : '0')));
+            
+            // Sync QM month/year with the current report date
+            const qmDateParts = this.currentDateYMD.split('-');
+            const qmRepYear = qmDateParts[0];
+            const qmRepMonth = (parseInt(qmDateParts[1]) - 1).toString();
+            
+            this.safeSet('qm_month', qmRepMonth);
+            this.safeSet('qm_year', qmRepYear);
+
+            ['reclamacoes', 'solucionadas', 'nao_solucionadas'].forEach(f => {
+                this.safeSet(`qm_${f}`, qm[f] || 0);
             });
 
             // Populate Complaints Inputs
@@ -574,8 +592,26 @@ const ReportApp = {
         card.style.cssText = 'background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); position: relative; display: flex; flex-direction: column; overflow: hidden; min-height: 480px;';
 
         const mIdx = parseInt(document.getElementById('safetyMonth').value) || 0;
-        const hVal = (data.monthlyHours && data.monthlyHours[mIdx]) ? data.monthlyHours[mIdx] : 0;
-        const cVal = (data.monthlyChecklist && data.monthlyChecklist[mIdx]) ? data.monthlyChecklist[mIdx] : 0;
+        let hVal = (data.monthlyHours && data.monthlyHours[mIdx]) ? data.monthlyHours[mIdx] : 0;
+        let cVal = (data.monthlyChecklist && data.monthlyChecklist[mIdx]) ? data.monthlyChecklist[mIdx] : 0;
+
+        // Carry over from previous months if empty (to maintain continuous history)
+        if (hVal === 0 && mIdx > 0) {
+            for (let j = mIdx - 1; j >= 0; j--) {
+                if (data.monthlyHours[j] > 0) {
+                    hVal = data.monthlyHours[j];
+                    break;
+                }
+            }
+        }
+        if (cVal === 0 && mIdx > 0) {
+            for (let j = mIdx - 1; j >= 0; j--) {
+                if (data.monthlyChecklist[j] > 0) {
+                    cVal = data.monthlyChecklist[j];
+                    break;
+                }
+            }
+        }
 
         const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
