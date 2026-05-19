@@ -85,7 +85,8 @@ const ReportApp = {
             monthlyProg: Array(12).fill(0),
             monthlyReal: Array(12).fill(0),
             objective: { dev: 0, rec: 0, hom: 0 },
-            modality: { ead: 0, ext: 0, pres: 0 }
+            modality: { ead: 0, ext: 0, pres: 0 },
+            kpi: { prog: 0, real: 0, atras: 0 }
         },
         forklifts: [
             {
@@ -519,6 +520,11 @@ const ReportApp = {
             const trMonthlyReal = tr.monthlyReal || Array(12).fill(0);
             trMonthlyProg.forEach((val, i) => this.safeSet(`tr_prog_${i}`, val));
             trMonthlyReal.forEach((val, i) => this.safeSet(`tr_real_${i}`, val));
+
+            const trKpi = tr.kpi || { prog: 0, real: 0, atras: 0 };
+            this.safeSet('train_prog', trKpi.prog || 0);
+            this.safeSet('train_real', trKpi.real || 0);
+            this.safeSet('train_atras', trKpi.atras || 0);
 
             const trObj = tr.objective || { dev: 0, rec: 0, hom: 0 };
             this.safeSet('train_obj_dev', trObj.dev || 0);
@@ -1956,37 +1962,40 @@ const ReportApp = {
         });
 
         // NC & Training (Global arrays)
-        if (global.qm) {
-            global.qm.nonConformities = {
-                nc: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`nc_val_${i}`).value) || 0),
-                dq: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`dq_val_${i}`).value) || 0),
-                ncStatus: {
-                    open: parseFloat(document.getElementById('nc_status_open').value) || 0,
-                    closed: parseFloat(document.getElementById('nc_status_closed').value) || 0
-                },
-                dqStatus: {
-                    open: parseFloat(document.getElementById('dq_status_open').value) || 0,
-                    closed: parseFloat(document.getElementById('dq_status_closed').value) || 0
-                }
-            };
-        }
+        if (!global.qm) global.qm = {};
+        global.qm.nonConformities = {
+            nc: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`nc_val_${i}`).value) || 0),
+            dq: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`dq_val_${i}`).value) || 0),
+            ncStatus: {
+                open: parseFloat(document.getElementById('nc_status_open').value) || 0,
+                closed: parseFloat(document.getElementById('nc_status_closed').value) || 0
+            },
+            dqStatus: {
+                open: parseFloat(document.getElementById('dq_status_open').value) || 0,
+                closed: parseFloat(document.getElementById('dq_status_closed').value) || 0
+            }
+        };
 
-        if (global.trainings) {
-            global.trainings = {
-                monthlyProg: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_prog_${i}`).value) || 0),
-                monthlyReal: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_real_${i}`).value) || 0),
-                objective: {
-                    dev: parseFloat(document.getElementById('train_obj_dev').value) || 0,
-                    rec: parseFloat(document.getElementById('train_obj_rec').value) || 0,
-                    hom: parseFloat(document.getElementById('train_obj_hom').value) || 0
-                },
-                modality: {
-                    ead: parseFloat(document.getElementById('train_mod_ead').value) || 0,
-                    ext: parseFloat(document.getElementById('train_mod_ext').value) || 0,
-                    pres: parseFloat(document.getElementById('train_mod_pres').value) || 0
-                }
-            };
-        }
+        if (!global.trainings) global.trainings = {};
+        global.trainings = {
+            monthlyProg: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_prog_${i}`).value) || 0),
+            monthlyReal: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_real_${i}`).value) || 0),
+            kpi: {
+                prog: parseFloat(document.getElementById('train_prog').value) || 0,
+                real: parseFloat(document.getElementById('train_real').value) || 0,
+                atras: parseFloat(document.getElementById('train_atras').value) || 0
+            },
+            objective: {
+                dev: parseFloat(document.getElementById('train_obj_dev').value) || 0,
+                rec: parseFloat(document.getElementById('train_obj_rec').value) || 0,
+                hom: parseFloat(document.getElementById('train_obj_hom').value) || 0
+            },
+            modality: {
+                ead: parseFloat(document.getElementById('train_mod_ead').value) || 0,
+                ext: parseFloat(document.getElementById('train_mod_ext').value) || 0,
+                pres: parseFloat(document.getElementById('train_mod_pres').value) || 0
+            }
+        };
 
         // Top 3
         global.top3 = Array.from({ length: 3 }, (_, i) => ({
