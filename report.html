@@ -1608,7 +1608,7 @@
                             SALVAR E FECHAR
                         </button>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem;">
                         <div>
                             <input type="hidden" id="safetyRecord" value="0">
                             <input type="hidden" id="safetyCurrent" value="0">
@@ -1640,6 +1640,12 @@
                             <input type="number" id="safetyNoLostTime" class="kpi-value" value="0"
                                 style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 700; font-size: 1rem; text-align: center;">
                         </div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <label
+                            style="display: block; font-size: 0.7rem; font-weight: 700; color: #64748b; margin-bottom: 0.25rem;">OBSERVAÇÕES CRÍTICAS</label>
+                        <textarea id="safetyObs" placeholder="Insira as observações críticas de segurança do dia..."
+                            style="width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; font-family: inherit; min-height: 60px; resize: vertical; outline: none;"></textarea>
                     </div>
                 </div>
 
@@ -1738,7 +1744,7 @@
 
                     <!-- Date Selection Row Below the line -->
                     <div style="display: flex; gap: 0.3rem; align-items: center; margin-bottom: 1rem;">
-                        <select id="safetyMonth" onchange="ReportApp.renderSafetyCross()"
+                        <select id="safetyMonth" onchange="ReportApp.changeSafetyMonthOrYear()"
                             style="background: #f8fafc; border: 1px solid #cbd5e1; color: #0f1a36; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 700; cursor: pointer; text-transform: uppercase; font-size: 0.65rem; min-width: 90px;">
                             <option value="0">JANEIRO</option>
                             <option value="1">FEVEREIRO</option>
@@ -1753,7 +1759,7 @@
                             <option value="10">NOVEMBRO</option>
                             <option value="11">DEZEMBRO</option>
                         </select>
-                        <select id="safetyYear" onchange="ReportApp.renderSafetyCross()"
+                        <select id="safetyYear" onchange="ReportApp.changeSafetyMonthOrYear()"
                             style="background: #f8fafc; border: 1px solid #cbd5e1; color: #0f1a36; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 700; cursor: pointer; font-size: 0.65rem;">
                             <option value="2025">2025</option>
                             <option value="2026" selected>2026</option>
@@ -1806,44 +1812,44 @@
                             <!-- Level 1 -->
                             <div class="p-row">
                                 <div class="p-spacer-left"></div>
-                                <div class="pyramid-level pl-1" contenteditable="true"><span>1</span></div>
+                                <div class="pyramid-level pl-1" contenteditable="true" id="bird_level_0"><span>1</span></div>
                                 <div class="dotted-line"></div>
-                                <div class="p-label-text" contenteditable="true">ACIDENTES GRAVES OU FATAIS</div>
+                                <div class="p-label-text" contenteditable="true" id="bird_label_0">ACIDENTES GRAVES OU FATAIS</div>
                             </div>
                             <!-- Level 2 -->
                             <div class="p-row">
                                 <div class="p-spacer-left"></div>
-                                <div class="pyramid-level pl-2" contenteditable="true"><span>10</span></div>
+                                <div class="pyramid-level pl-2" contenteditable="true" id="bird_level_1"><span>10</span></div>
                                 <div class="dotted-line"></div>
-                                <div class="p-label-text" contenteditable="true">ACIDENTES COM AFASTAMENTO</div>
+                                <div class="p-label-text" contenteditable="true" id="bird_label_1">ACIDENTES COM AFASTAMENTO</div>
                             </div>
                             <!-- Level 3 -->
                             <div class="p-row">
                                 <div class="p-spacer-left"></div>
-                                <div class="pyramid-level pl-3" contenteditable="true"><span>30</span></div>
+                                <div class="pyramid-level pl-3" contenteditable="true" id="bird_level_2"><span>30</span></div>
                                 <div class="dotted-line"></div>
-                                <div class="p-label-text" contenteditable="true">ACIDENTES COM LESÃO LEVE</div>
+                                <div class="p-label-text" contenteditable="true" id="bird_label_2">ACIDENTES COM LESÃO LEVE</div>
                             </div>
                             <!-- Level 4 -->
                             <div class="p-row">
                                 <div class="p-spacer-left"></div>
-                                <div class="pyramid-level pl-4" contenteditable="true"><span>600</span></div>
+                                <div class="pyramid-level pl-4" contenteditable="true" id="bird_level_3"><span>600</span></div>
                                 <div class="dotted-line"></div>
-                                <div class="p-label-text" contenteditable="true">INCIDENTES SEM LESÃO</div>
+                                <div class="p-label-text" contenteditable="true" id="bird_label_3">INCIDENTES SEM LESÃO</div>
                             </div>
                             <!-- Level 5 -->
                             <div class="p-row">
                                 <div class="p-spacer-left"></div>
-                                <div class="pyramid-level pl-5" contenteditable="true"><span>1000</span></div>
+                                <div class="pyramid-level pl-5" contenteditable="true" id="bird_level_4"><span>1000</span></div>
                                 <div class="dotted-line"></div>
-                                <div class="p-label-text" contenteditable="true">DESVIOS COMPORTAMENTAIS</div>
+                                <div class="p-label-text" contenteditable="true" id="bird_label_4">DESVIOS COMPORTAMENTAIS</div>
                             </div>
                             <!-- Level 6 -->
                             <div class="p-row">
                                 <div class="p-spacer-left"></div>
-                                <div class="pyramid-level pl-6" contenteditable="true"><span>10000</span></div>
+                                <div class="pyramid-level pl-6" contenteditable="true" id="bird_level_5"><span>10000</span></div>
                                 <div class="dotted-line"></div>
-                                <div class="p-label-text" contenteditable="true">ATOS / CONDIÇÕES INSEGURAS</div>
+                                <div class="p-label-text" contenteditable="true" id="bird_label_5">ATOS / CONDIÇÕES INSEGURAS</div>
                             </div>
                         </div>
                     </div>
@@ -1998,8 +2004,29 @@
                         <div
                             style="font-size: 0.85rem; font-weight: 800; color: #0f1a36; margin-bottom: 1rem; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
                             <span style="display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-tint"></i>
-                                Água
-                                Empilhadeira</span>
+                                Água Empilhadeira
+                                <select id="waterCardMonth" onchange="ReportApp.changeWaterMonthOrYear(this.value, null)"
+                                    style="background: #f8fafc; border: 1px solid #cbd5e1; color: #3b82f6; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.65rem; min-width: 90px; margin-left: 0.5rem; display: inline-block; vertical-align: middle;">
+                                    <option value="0">JANEIRO</option>
+                                    <option value="1">FEVEREIRO</option>
+                                    <option value="2">MARÇO</option>
+                                    <option value="3">ABRIL</option>
+                                    <option value="4">MAIO</option>
+                                    <option value="5">JUNHO</option>
+                                    <option value="6">JULHO</option>
+                                    <option value="7">AGOSTO</option>
+                                    <option value="8">SETEMBRO</option>
+                                    <option value="9">OUTUBRO</option>
+                                    <option value="10">NOVEMBRO</option>
+                                    <option value="11">DEZEMBRO</option>
+                                </select>
+                                <select id="waterCardYear" onchange="ReportApp.changeWaterMonthOrYear(null, this.value)"
+                                    style="background: #f8fafc; border: 1px solid #cbd5e1; color: #3b82f6; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 800; cursor: pointer; font-size: 0.65rem; display: inline-block; vertical-align: middle; margin-left: 0.2rem;">
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2027">2027</option>
+                                </select>
+                            </span>
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <button onclick="ReportApp.toggleWaterPanel()" title="Alimentar Controle de Água"
                                     style="background: transparent; border: none; font-size: 0.9rem; color: #94a3b8; cursor: pointer; transition: color 0.2s;">
@@ -2014,8 +2041,29 @@
                             <div
                                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                                 <div
-                                    style="font-size: 0.85rem; font-weight: 800; color: #1e293b; text-transform: uppercase;">
+                                    style="font-size: 0.85rem; font-weight: 800; color: #1e293b; text-transform: uppercase; display: flex; align-items: center; gap: 0.5rem;">
                                     <i class="fas fa-edit"></i> Água Empilhadeira
+                                    <select id="waterPanelMonth" onchange="ReportApp.changeWaterMonthOrYear(this.value, null)"
+                                        style="background: #f8fafc; border: 1px solid #cbd5e1; color: #3b82f6; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 800; cursor: pointer; text-transform: uppercase; font-size: 0.65rem; min-width: 90px; margin-left: 0.5rem; display: inline-block; vertical-align: middle;">
+                                        <option value="0">JANEIRO</option>
+                                        <option value="1">FEVEREIRO</option>
+                                        <option value="2">MARÇO</option>
+                                        <option value="3">ABRIL</option>
+                                        <option value="4">MAIO</option>
+                                        <option value="5">JUNHO</option>
+                                        <option value="6">JULHO</option>
+                                        <option value="7">AGOSTO</option>
+                                        <option value="8">SETEMBRO</option>
+                                        <option value="9">OUTUBRO</option>
+                                        <option value="10">NOVEMBRO</option>
+                                        <option value="11">DEZEMBRO</option>
+                                    </select>
+                                    <select id="waterPanelYear" onchange="ReportApp.changeWaterMonthOrYear(null, this.value)"
+                                        style="background: #f8fafc; border: 1px solid #cbd5e1; color: #3b82f6; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 800; cursor: pointer; font-size: 0.65rem; display: inline-block; vertical-align: middle; margin-left: 0.2rem;">
+                                        <option value="2025">2025</option>
+                                        <option value="2026">2026</option>
+                                        <option value="2027">2027</option>
+                                    </select>
                                 </div>
                                 <button onclick="event.stopPropagation(); ReportApp.toggleWaterPanel()"
                                     style="background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; cursor: pointer;">

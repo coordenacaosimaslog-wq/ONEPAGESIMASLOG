@@ -35,6 +35,7 @@ const ReportApp = {
     donoRuaTop5ChartInstance: null,
     galpaoDonutChartInstance: null,
     lupsChartInstance: null,
+    currentWaterMonthKey: null,
 
     // Default Template for new Operations
     defaultTemplate: {
@@ -117,7 +118,18 @@ const ReportApp = {
             worst: { name: '', score: 0, gender: 'male' }
         },
         lups: [],
-        melhorias: []
+        melhorias: [],
+        birdPyramid: {
+            levels: ['1', '10', '30', '600', '1000', '10000'],
+            labels: [
+                'ACIDENTES GRAVES OU FATAIS',
+                'ACIDENTES COM AFASTAMENTO',
+                'ACIDENTES COM LESÃO LEVE',
+                'INCIDENTES SEM LESÃO',
+                'DESVIOS COMPORTAMENTAIS',
+                'ATOS / CONDIÇÕES INSEGURAS'
+            ]
+        }
     },
 
     init: async function () {
@@ -144,34 +156,19 @@ const ReportApp = {
                     this.migrateData(); // Convert old format if necessary
                 } else {
                     // Firebase is empty, check if we have local data to upload
-                    const localSaved = localStorage.getItem('simas_report_data');
-                    if (localSaved) {
-                        try {
-                            this.data = JSON.parse(localSaved);
-                            this.migrateData();
-                            this.saveToLocalStorage(); // This will push to Firebase
-                        } catch (e) {
-                            this.data = {};
-                        }
-                    } else {
-                        this.data = {};
-                    }
+                    this.data = this.loadFromLocalStorageFallback();
+                    this.migrateData();
+                    this.saveToLocalStorage(true, true); // Push migrated/full local data to Firebase
                 }
             } catch (e) {
                 console.error("Firebase load error", e);
-                this.data = {};
+                this.data = this.loadFromLocalStorageFallback();
+                this.migrateData();
             }
         } else {
             // Fallback to localStorage if Firebase not initialized
-            const saved = localStorage.getItem('simas_report_data');
-            if (saved) {
-                try {
-                    this.data = JSON.parse(saved);
-                    this.migrateData();
-                } catch (e) {
-                    this.data = {};
-                }
-            }
+            this.data = this.loadFromLocalStorageFallback();
+            this.migrateData();
         }
 
 
@@ -195,7 +192,8 @@ const ReportApp = {
         let autoSaveTimeout;
         document.addEventListener('input', (e) => {
             const tag = e.target.tagName;
-            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+            const isContentEditable = e.target.getAttribute('contenteditable') === 'true' || e.target.closest('[contenteditable="true"]');
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || isContentEditable) {
                 clearTimeout(autoSaveTimeout);
                 autoSaveTimeout = setTimeout(() => {
                     this.saveData(true);
@@ -211,6 +209,14 @@ const ReportApp = {
             }
         });
 
+        // Save immediately when clicking outside a contenteditable element
+        document.addEventListener('focusout', (e) => {
+            const isContentEditable = e.target.getAttribute('contenteditable') === 'true' || e.target.closest('[contenteditable="true"]');
+            if (isContentEditable) {
+                this.saveData(true, true);
+            }
+        });
+
         // Focus listeners for textareas (auto-resize)
         document.querySelectorAll('textarea').forEach(tx => {
             tx.addEventListener('input', function () {
@@ -220,11 +226,43 @@ const ReportApp = {
         });
 
         this.setupValidation();
+
+        // Run background migration for existing bloated images
+        this.migrateExistingImages();
     },
 
     triggerUpload: function (index) {
         const el = document.getElementById(`file-${index}`);
         if (el) el.click();
+    },
+
+    loadFromLocalStorageFallback: function () {
+        let localData = {};
+        
+        // 1. Read from the unified key (older data format)
+        try {
+            const saved = localStorage.getItem('simas_report_data');
+            if (saved) {
+                localData = JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error("Erro ao carregar do localStorage unificado:", e);
+        }
+        
+        // 2. Read and merge individual operation keys (newer optimized format)
+        const operations = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari"];
+        for (let op of operations) {
+            try {
+                const opSaved = localStorage.getItem('simas_report_data_' + op);
+                if (opSaved) {
+                    localData[op] = JSON.parse(opSaved);
+                }
+            } catch (e) {
+                console.error(`Erro ao carregar filial ${op} do localStorage:`, e);
+            }
+        }
+        
+        return localData;
     },
 
     migrateData: function () {
@@ -247,35 +285,77 @@ const ReportApp = {
                 migrated = true;
             }
         }
-        if (migrated) this.saveToLocalStorage();
+        if (migrated) this.saveToLocalStorage(true, true);
     },
 
-    saveToLocalStorage: function () {
+    saveTimeout: null,
+    saveToLocalStorage: function (forceImmediate = false, saveFullOp = false) {
         const opToSave = this.currentOp;
-        // Deep copy the specific operation data to avoid reference mutations during async timeout
-        const dataToSave = JSON.parse(JSON.stringify(this.data[opToSave]));
+        const dateYMD = this.currentDateYMD;
         
-        // Run asynchronously to prevent UI freeze during heavy JSON stringify or Firebase ops
-        setTimeout(() => {
-            if (window.firebaseDB) {
-                window.firebaseDB.ref('simas_report_data/' + opToSave).set(dataToSave);
+        const saveFn = () => {
+            // 1. Save to Firebase
+            if (window.firebaseDB && this.data[opToSave]) {
+                const opRef = window.firebaseDB.ref('simas_report_data/' + opToSave);
+                if (saveFullOp) {
+                    console.log(`[Firebase] Salvando filial completa para persistência global: ${opToSave}`);
+                    const dataToSave = JSON.parse(JSON.stringify(this.data[opToSave]));
+                    opRef.set(dataToSave);
+                } else {
+                    console.log(`[Firebase] Salvando alterações ativas da filial ${opToSave} (${dateYMD})`);
+                    
+                    // Daily node for current date
+                    if (this.data[opToSave].daily && this.data[opToSave].daily[dateYMD]) {
+                        opRef.child('daily/' + dateYMD).set(this.data[opToSave].daily[dateYMD]);
+                    }
+                    
+                    // Monthly node for current month
+                    const mEl = document.getElementById('safetyMonth');
+                    const yEl = document.getElementById('safetyYear');
+                    const m = mEl ? parseInt(mEl.value) : new Date().getMonth();
+                    const y = yEl ? parseInt(yEl.value) : new Date().getFullYear();
+                    const monthKey = `${y}-${(m + 1).toString().padStart(2, '0')}`;
+                    if (this.data[opToSave].monthly && this.data[opToSave].monthly[monthKey]) {
+                        opRef.child('monthly/' + monthKey).set(this.data[opToSave].monthly[monthKey]);
+                    }
+                    
+                    // Global node
+                    if (this.data[opToSave].global) {
+                        opRef.child('global').set(this.data[opToSave].global);
+                    }
+                }
             }
+            
+            // 2. Save to localStorage
             try {
+                // Save current operation data under its own key (fast and bypasses localStorage limit constraints)
+                if (this.data[opToSave]) {
+                    localStorage.setItem('simas_report_data_' + opToSave, JSON.stringify(this.data[opToSave]));
+                }
+                // Save global key as fallback (if it fails due to size limit, individual key remains safe)
                 localStorage.setItem('simas_report_data', JSON.stringify(this.data));
             } catch (e) {
                 console.error("Erro ao salvar no localStorage (limite excedido?):", e);
             }
-        }, 10);
+        };
+
+        if (forceImmediate) {
+            clearTimeout(this.saveTimeout);
+            saveFn();
+        } else {
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = setTimeout(saveFn, 300); // 300ms debounce
+        }
     },
 
     changeOperation: function (newOp) {
-        this.saveData(true);
+        this.saveData(true, true);
         if (newOp) this.currentOp = newOp;
         this.render();
     },
 
     changeDate: function () {
-        this.saveData(true);
+        this.saveData(true, true);
         this.currentDateYMD = document.getElementById('reportDatePicker').value;
 
         // Update display
@@ -538,11 +618,36 @@ const ReportApp = {
             this.updateTrainingCharts();
 
             // 8. Forklift Water Section
-            const water = opData.forkliftWater || this.defaultTemplate.forkliftWater;
+            const mEl = document.getElementById('safetyMonth');
+            const yEl = document.getElementById('safetyYear');
+            const m = mEl ? parseInt(mEl.value) : new Date().getMonth();
+            const y = yEl ? parseInt(yEl.value) : new Date().getFullYear();
+            const waterMonthKey = `${y}-${(m + 1).toString().padStart(2, '0')}`;
+            this.currentWaterMonthKey = waterMonthKey;
+
+            const opForWater = this.data[this.currentOp] || { monthly: {} };
+            const monthlyData = (opForWater.monthly && opForWater.monthly[waterMonthKey]) ? opForWater.monthly[waterMonthKey] : {};
+            const water = monthlyData.forkliftWater || this.defaultTemplate.forkliftWater || [0, 0, 0, 0];
+
             water.forEach((val, idx) => {
                 this.safeSet(`water_w${idx + 1}`, val);
             });
             this.updateWaterChart();
+
+            // 8.1 Bird Pyramid Section
+            const bp = opData.birdPyramid || this.defaultTemplate.birdPyramid || { levels: [], labels: [] };
+            for (let i = 0; i < 6; i++) {
+                const lvlEl = document.getElementById(`bird_level_${i}`);
+                if (lvlEl) lvlEl.innerHTML = `<span>${bp.levels[i] || ''}</span>`;
+                const lblEl = document.getElementById(`bird_label_${i}`);
+                if (lblEl) lblEl.innerText = bp.labels[i] || '';
+            }
+
+            // 8.2 Forklift Water Month & Year Dropdowns Sync
+            this.safeSet('waterCardMonth', m.toString());
+            this.safeSet('waterCardYear', y.toString());
+            this.safeSet('waterPanelMonth', m.toString());
+            this.safeSet('waterPanelYear', y.toString());
 
             // 9. Dono da Rua / 5S
             const donoRua = opData.donoRua || this.defaultTemplate.donoRua;
@@ -794,6 +899,9 @@ const ReportApp = {
     },
 
     addLicense: function() {
+        // Sync DOM inputs first to preserve any unsaved typing
+        this.gatherDataFromDOM();
+
         if (!this.data[this.currentOp]) {
             this.data[this.currentOp] = { global: JSON.parse(JSON.stringify(this.defaultTemplate)), daily: {}, monthly: {} };
         }
@@ -802,16 +910,24 @@ const ReportApp = {
             opGlobal.licenses = Array(4).fill({ name: '', date: '', status: 'regular' });
         }
         opGlobal.licenses.push({ name: '', date: '', status: 'regular' });
-        this.saveData(true);
+        
+        // Save directly to bypass redundant/buggy gatherDataFromDOM on obsolete elements
+        this.saveToLocalStorage(true, true);
         this.render();
     },
 
     removeLicense: function(index) {
         if (!confirm('Deseja realmente remover esta licença?')) return;
+        
+        // Sync DOM inputs first to preserve any unsaved typing
+        this.gatherDataFromDOM();
+
         const opGlobal = this.data[this.currentOp].global;
         if (opGlobal && opGlobal.licenses) {
             opGlobal.licenses.splice(index, 1);
-            this.saveData(true);
+            
+            // Save directly to bypass gatherDataFromDOM reading from obsolete DOM elements before rendering
+            this.saveToLocalStorage(true, true);
             this.render();
         }
     },
@@ -845,16 +961,16 @@ const ReportApp = {
         const operations = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari"];
 
         operations.forEach(op => {
-            const opData = this.data[op];
-            if (!opData) return; // Skip if no data for this op yet
+            const opCombined = this.getDataForOp(op);
+            if (!opCombined) return;
 
             // Aggregations
-            const nc = parseInt(opData.qm?.nc || 0);
-            const train = parseInt(opData.trainings?.real || 0);
+            const nc = parseInt(opCombined.qm?.reclamacoes || 0);
+            const train = parseInt(opCombined.trainings?.kpi?.real || 0);
             totalNC += nc;
             totalTrain += train;
 
-            const safetyStatus = opData.safety?.status === 'sem_acidente'
+            const safetyStatus = opCombined.safety?.status === 'sem_acidente'
                 ? '<span style="color:#16a34a; font-weight:700;">✅ OK</span>'
                 : '<span style="color:#dc2626; font-weight:700;">⚠️ ACIDENTE</span>';
 
@@ -865,7 +981,7 @@ const ReportApp = {
                 <td style="padding:1rem; border-bottom:1px solid #e2e8f0; font-weight:bold;">${nc}</td>
                 <td style="padding:1rem; border-bottom:1px solid #e2e8f0; font-weight:bold; color:#166534;">${train}</td>
                 <td style="padding:1rem; border-bottom:1px solid #e2e8f0; font-size:0.8rem; text-align:left; max-width:200px;">
-                    ${opData.qm?.obs ? opData.qm.obs.substring(0, 50) + '...' : '-'}
+                    ${opCombined.safety?.obs ? opCombined.safety.obs.substring(0, 50) + '...' : '-'}
                 </td>
             `;
             tbody.appendChild(tr);
@@ -2005,6 +2121,17 @@ const ReportApp = {
             evol: parseFloat(document.getElementById(`prob_evol_${i}`).value) || 0
         }));
 
+        // Bird Pyramid
+        if (!global.birdPyramid) global.birdPyramid = {};
+        global.birdPyramid.levels = Array.from({ length: 6 }, (_, i) => {
+            const el = document.getElementById(`bird_level_${i}`);
+            return el ? el.innerText.trim() : (this.defaultTemplate.birdPyramid?.levels[i] || '');
+        });
+        global.birdPyramid.labels = Array.from({ length: 6 }, (_, i) => {
+            const el = document.getElementById(`bird_label_${i}`);
+            return el ? el.innerText.trim() : (this.defaultTemplate.birdPyramid?.labels[i] || '');
+        });
+
         // --- MONTHLY (Resets by month) ---
         const qmMonthEl = document.getElementById('qm_month');
         const qmYearEl = document.getElementById('qm_year');
@@ -2015,7 +2142,13 @@ const ReportApp = {
         if (!op.monthly[qmMonthKey]) op.monthly[qmMonthKey] = {};
         const qmMonthly = op.monthly[qmMonthKey];
 
-        monthly.forkliftWater = [
+        if (!this.currentWaterMonthKey) {
+            this.currentWaterMonthKey = monthKey;
+        }
+        if (!op.monthly[this.currentWaterMonthKey]) {
+            op.monthly[this.currentWaterMonthKey] = {};
+        }
+        op.monthly[this.currentWaterMonthKey].forkliftWater = [
             parseFloat(document.getElementById('water_w1').value) || 0,
             parseFloat(document.getElementById('water_w2').value) || 0,
             parseFloat(document.getElementById('water_w3').value) || 0,
@@ -2050,7 +2183,8 @@ const ReportApp = {
             sc_open: document.getElementById('sc_open')?.value || 0,
             sc_closed: document.getElementById('sc_closed')?.value || 0,
             sc_rejected: document.getElementById('sc_rejected')?.value || 0,
-            sc_total: document.getElementById('sc_total')?.value || 0
+            sc_total: document.getElementById('sc_total')?.value || 0,
+            obs: document.getElementById('safetyObs')?.value || ''
         });
 
         daily.donoRua = {
@@ -2078,9 +2212,9 @@ const ReportApp = {
         };
     },
 
-    saveData: function (silent = false) {
+    saveData: function (silent = false, forceImmediate = false) {
         this.gatherDataFromDOM();
-        this.saveToLocalStorage();
+        this.saveToLocalStorage(forceImmediate);
 
         if (silent) return;
 
@@ -2169,7 +2303,8 @@ const ReportApp = {
         if (op && op.daily && op.daily[dateYMD]) {
             delete op.daily[dateYMD];
             // Save directly to storage, bypass gatherDataFromDOM so it doesn't recreate from current screen
-            this.saveToLocalStorage();
+            // Since we deleted history, we must remove it from Firebase too by doing a full sync
+            this.saveToLocalStorage(true, true);
             this.renderHistoryList();
             
             // If the deleted date is the currently active one, refresh the screen to clear values
@@ -2179,6 +2314,61 @@ const ReportApp = {
             
             alert('Histórico excluído com sucesso!');
         }
+    },
+
+    changeSafetyMonthOrYear: function () {
+        // 1. Save currently displayed water data to the OLD month key (currentWaterMonthKey)
+        if (this.currentWaterMonthKey && this.currentOp) {
+            const op = this.data[this.currentOp];
+            if (op) {
+                if (!op.monthly) op.monthly = {};
+                if (!op.monthly[this.currentWaterMonthKey]) op.monthly[this.currentWaterMonthKey] = {};
+                
+                const water = [];
+                for (let i = 1; i <= 4; i++) {
+                    const el = document.getElementById(`water_w${i}`);
+                    water.push(el ? (parseInt(el.value) || 0) : 0);
+                }
+                op.monthly[this.currentWaterMonthKey].forkliftWater = water;
+                this.saveToLocalStorage(true, true);
+            }
+        }
+
+        // 2. Update currentWaterMonthKey to the new month/year from dropdowns
+        const mEl = document.getElementById('safetyMonth');
+        const yEl = document.getElementById('safetyYear');
+        const m = mEl ? parseInt(mEl.value) : new Date().getMonth();
+        const y = yEl ? parseInt(yEl.value) : new Date().getFullYear();
+        this.currentWaterMonthKey = `${y}-${(m + 1).toString().padStart(2, '0')}`;
+
+        // Sync the newly added selectors in Forklift Water to match safetyMonth and safetyYear
+        this.safeSet('waterCardMonth', m.toString());
+        this.safeSet('waterCardYear', y.toString());
+        this.safeSet('waterPanelMonth', m.toString());
+        this.safeSet('waterPanelYear', y.toString());
+
+        // 3. Render safety cross for the new month/year
+        this.renderSafetyCross();
+
+        // 4. Load and render water data for the new month/year
+        const op = this.data[this.currentOp] || { monthly: {} };
+        const monthlyData = (op.monthly && op.monthly[this.currentWaterMonthKey]) ? op.monthly[this.currentWaterMonthKey] : {};
+        const water = monthlyData.forkliftWater || this.defaultTemplate.forkliftWater || [0, 0, 0, 0];
+
+        water.forEach((val, idx) => {
+            this.safeSet(`water_w${idx + 1}`, val);
+        });
+        this.updateWaterChart();
+    },
+
+    changeWaterMonthOrYear: function (mVal, yVal) {
+        if (mVal !== null && mVal !== undefined) {
+            this.safeSet('safetyMonth', mVal);
+        }
+        if (yVal !== null && yVal !== undefined) {
+            this.safeSet('safetyYear', yVal);
+        }
+        this.changeSafetyMonthOrYear();
     },
 
     setupValidation: function () {
@@ -2850,24 +3040,21 @@ const ReportApp = {
         // Removed synchronous this.saveData(true) to prevent UI freezing
     },
 
-    handleLupImage: function (idx, field, input) {
+    handleLupImage: async function (idx, field, input) {
         if (input.files && input.files[0]) {
             const file = input.files[0];
-            if (file.size > 2 * 1024 * 1024) {
-                alert('A imagem é muito grande (máx 2MB).');
-                input.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => {
+            try {
+                const compressedBase64 = await this.compressImage(file);
                 const op = this.data[this.currentOp];
                 const dateYMD = this.currentDateYMD;
                 if (!op.daily[dateYMD].lups) return;
-                op.daily[dateYMD].lups[idx][field] = e.target.result;
+                op.daily[dateYMD].lups[idx][field] = compressedBase64;
                 this.renderLupCards();
                 this.saveData(true);
-            };
-            reader.readAsDataURL(file);
+            } catch (err) {
+                console.error("Erro ao processar imagem da LUP:", err);
+                alert("Erro ao processar imagem.");
+            }
         }
     },
 
@@ -3018,24 +3205,21 @@ const ReportApp = {
         // Removed synchronous this.saveData(true) to prevent UI freezing
     },
 
-    handleMelhoriaImage: function (idx, field, input) {
+    handleMelhoriaImage: async function (idx, field, input) {
         if (input.files && input.files[0]) {
             const file = input.files[0];
-            if (file.size > 2 * 1024 * 1024) {
-                alert('A imagem é muito grande (máx 2MB).');
-                input.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => {
+            try {
+                const compressedBase64 = await this.compressImage(file);
                 const op = this.data[this.currentOp];
                 const dateYMD = this.currentDateYMD;
                 if (!op.daily[dateYMD].melhorias) return;
-                op.daily[dateYMD].melhorias[idx][field] = e.target.result;
+                op.daily[dateYMD].melhorias[idx][field] = compressedBase64;
                 this.renderMelhoriaCards();
-                this.saveData(true);
-            };
-            reader.readAsDataURL(file);
+                this.saveData(true, true);
+            } catch (err) {
+                console.error("Erro ao processar imagem da melhoria:", err);
+                alert("Erro ao processar imagem.");
+            }
         }
     },
 
@@ -3063,28 +3247,25 @@ const ReportApp = {
         this.renderSafetyCross();
     },
 
-    handleImageUpload: function (event, index) {
+    handleImageUpload: async function (event, index) {
         const file = event.target.files[0];
         if (!file) return;
 
-        if (file.size > 2 * 1024 * 1024) {
-            alert('A imagem é muito grande (máx 2MB).');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
+        try {
+            const compressedBase64 = await this.compressImage(file);
             const op = this.data[this.currentOp];
             const dateYMD = this.currentDateYMD;
             if (!op.daily[dateYMD]) op.daily[dateYMD] = {};
             if (!op.daily[dateYMD].safety) op.daily[dateYMD].safety = {};
             if (!op.daily[dateYMD].safety.images) op.daily[dateYMD].safety.images = ['', '', ''];
 
-            op.daily[dateYMD].safety.images[index] = e.target.result;
-            this.saveData(true);
+            op.daily[dateYMD].safety.images[index] = compressedBase64;
+            this.saveData(true, true);
             this.render();
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+            console.error("Erro ao processar imagem de segurança:", err);
+            alert("Erro ao processar imagem.");
+        }
     },
 
     toggleSafetyGeneralPanel: function () {
@@ -3100,7 +3281,13 @@ const ReportApp = {
 
     toggleWaterPanel: function () {
         const panel = document.getElementById('waterPanel');
-        if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        if (panel) {
+            const isClosing = panel.style.display !== 'none';
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            if (isClosing) {
+                this.saveData(true, true);
+            }
+        }
     },
 
     toggleForkliftPanel: function (index) {
@@ -3119,6 +3306,140 @@ const ReportApp = {
         if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     },
 
+    compressBase64Image: function (base64Str, maxWidth = 1000, maxHeight = 1000, quality = 0.7) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                resolve(compressedBase64);
+            };
+            img.onerror = (err) => reject(err);
+            img.src = base64Str;
+        });
+    },
+
+    compressImage: function (file, maxWidth = 1000, maxHeight = 1000, quality = 0.7) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this.compressBase64Image(e.target.result, maxWidth, maxHeight, quality)
+                    .then(resolve)
+                    .catch(reject);
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+        });
+    },
+
+    migrateExistingImages: async function () {
+        console.log("Iniciando escaneamento e migração de imagens grandes em background...");
+        let migrated = false;
+        for (let opName in this.data) {
+            const op = this.data[opName];
+            if (!op.daily) continue;
+            
+            for (let dateYMD in op.daily) {
+                const daily = op.daily[dateYMD];
+                
+                // 1. Safety images
+                if (daily.safety && daily.safety.images) {
+                    for (let i = 0; i < daily.safety.images.length; i++) {
+                        const img = daily.safety.images[i];
+                        if (img && img.startsWith('data:image/') && img.length > 250000) {
+                            try {
+                                console.log(`Comprimindo imagem antiga de Segurança da filial ${opName} em ${dateYMD}...`);
+                                daily.safety.images[i] = await this.compressBase64Image(img);
+                                migrated = true;
+                            } catch (e) {
+                                console.error("Erro migrando imagem de segurança:", e);
+                            }
+                        }
+                    }
+                }
+                
+                // 2. LUPs
+                if (daily.lups) {
+                    for (let i = 0; i < daily.lups.length; i++) {
+                        const lup = daily.lups[i];
+                        if (lup.imgErrado && lup.imgErrado.startsWith('data:image/') && lup.imgErrado.length > 250000) {
+                            try {
+                                console.log(`Comprimindo imagem antiga do Desvio de LUP #${i+1} da filial ${opName} em ${dateYMD}...`);
+                                lup.imgErrado = await this.compressBase64Image(lup.imgErrado);
+                                migrated = true;
+                            } catch (e) {
+                                console.error("Erro migrando imgErrado de LUP:", e);
+                            }
+                        }
+                        if (lup.imgCerto && lup.imgCerto.startsWith('data:image/') && lup.imgCerto.length > 250000) {
+                            try {
+                                console.log(`Comprimindo imagem antiga do Padrão de LUP #${i+1} da filial ${opName} em ${dateYMD}...`);
+                                lup.imgCerto = await this.compressBase64Image(lup.imgCerto);
+                                migrated = true;
+                            } catch (e) {
+                                console.error("Erro migrando imgCerto de LUP:", e);
+                            }
+                        }
+                    }
+                }
+                
+                // 3. Melhorias
+                if (daily.melhorias) {
+                    for (let i = 0; i < daily.melhorias.length; i++) {
+                        const m = daily.melhorias[i];
+                        if (m.imgAntes && m.imgAntes.startsWith('data:image/') && m.imgAntes.length > 250000) {
+                            try {
+                                console.log(`Comprimindo imagem antiga de Melhoria Antes #${i+1} da filial ${opName} em ${dateYMD}...`);
+                                m.imgAntes = await this.compressBase64Image(m.imgAntes);
+                                migrated = true;
+                            } catch (e) {
+                                console.error("Erro migrando imgAntes de Melhoria:", e);
+                            }
+                        }
+                        if (m.imgDepois && m.imgDepois.startsWith('data:image/') && m.imgDepois.length > 250000) {
+                            try {
+                                console.log(`Comprimindo imagem antiga de Melhoria Depois #${i+1} da filial ${opName} em ${dateYMD}...`);
+                                m.imgDepois = await this.compressBase64Image(m.imgDepois);
+                                migrated = true;
+                            } catch (e) {
+                                console.error("Erro migrando imgDepois de Melhoria:", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (migrated) {
+            console.log("Migração/Compressão concluída com sucesso! Atualizando localStorage e Firebase...");
+            // Save full operations so historical date changes are successfully propagated
+            this.saveToLocalStorage(false, true);
+            this.render();
+        } else {
+            console.log("Escaneamento de background concluído. Nenhuma imagem antiga precisou de compressão.");
+        }
+    }
 
 };
 
