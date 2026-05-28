@@ -54,6 +54,7 @@ const ReportApp = {
             current_days: '0',
             lost_time: '0',
             no_lost_time: '0',
+            last_accident_date: '',
             cross: {},
             obs: '',
             images: ['', '', ''],
@@ -396,11 +397,22 @@ const ReportApp = {
         }
 
         // Apply Daily Overrides
+        if (!combined.safety) combined.safety = {};
         if (op.daily && op.daily[dateYMD]) {
             Object.assign(combined, op.daily[dateYMD]);
-            if (op.daily[dateYMD].safety) Object.assign(combined.safety, op.daily[dateYMD].safety);
+            if (op.daily[dateYMD].safety) {
+                // Sincroniza apenas as propriedades específicas do dia, mantendo os indicadores globais da filial
+                const dailySafety = op.daily[dateYMD].safety;
+                combined.safety.status = dailySafety.status || 'sem_acidente';
+                combined.safety.images = dailySafety.images || ['', '', ''];
+                combined.safety.sc_open = dailySafety.sc_open || '0';
+                combined.safety.sc_closed = dailySafety.sc_closed || '0';
+                combined.safety.sc_rejected = dailySafety.sc_rejected || '0';
+                combined.safety.sc_total = dailySafety.sc_total || '0';
+                combined.safety.obs = dailySafety.obs || '';
+            }
         } else {
-            // Day Resets
+            // Day Resets (Mantém os indicadores globais da filial intocados)
             combined.intro = '';
             combined.safety.status = 'sem_acidente';
             combined.safety.images = ['', '', ''];
@@ -2022,6 +2034,16 @@ const ReportApp = {
         global.area = document.getElementById('areaName').value;
         global.version = document.getElementById('reportVersion').value;
 
+        // Persistência global dos indicadores de segurança da filial
+        if (!global.safety) global.safety = {};
+        Object.assign(global.safety, {
+            record: document.getElementById('safetyRecord')?.value || '0',
+            current_days: document.getElementById('safetyCurrent')?.value || '0',
+            lost_time: document.getElementById('safetyLostTime')?.value || '0',
+            no_lost_time: document.getElementById('safetyNoLostTime')?.value || '0',
+            last_accident_date: document.getElementById('safetyLastAccident')?.value || ''
+        });
+
         global.licenses = (global.licenses || []).map((lic, i) => {
             const nameEl = document.getElementById(`lic_name_${i}`);
             if (!nameEl) return lic; // Preserva licenças recém-adicionadas que ainda não foram renderizadas
@@ -3270,8 +3292,14 @@ const ReportApp = {
 
     toggleSafetyGeneralPanel: function () {
         const panel = document.getElementById('safetyGeneralPanel');
-        if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        if (panel && panel.style.display === 'none') this.updateSafetyVisuals(); // Refresh display
+        if (panel) {
+            const isClosing = panel.style.display !== 'none';
+            panel.style.display = isClosing ? 'none' : 'block';
+            if (isClosing) {
+                this.updateSafetyVisuals(); // Refresh display
+                this.saveData(true, true); // Immediate save to Firebase & LocalStorage
+            }
+        }
     },
 
     toggleSafetyCardsPanel: function () {
