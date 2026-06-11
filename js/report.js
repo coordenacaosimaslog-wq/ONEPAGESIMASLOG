@@ -138,7 +138,7 @@ const ReportApp = {
         const urlParams = new URLSearchParams(window.location.search);
         const paramDate = urlParams.get('date');
         this.currentDateYMD = paramDate || new Date().toISOString().split('T')[0];
-        document.getElementById('reportDatePicker').value = this.currentDateYMD;
+        if(document.getElementById('reportDatePicker')) document.getElementById('reportDatePicker').value = this.currentDateYMD;
 
         // Update display dates
         const [y, m, d] = this.currentDateYMD.split('-');
@@ -161,11 +161,10 @@ const ReportApp = {
                     this.migrateData();
                     this.saveToLocalStorage(true, true); // Push migrated/full local data to Firebase
                 }
-            } catch (e) {
+            } catch (e) { 
                 console.error("Firebase load error", e);
                 this.data = this.loadFromLocalStorageFallback();
-                this.migrateData();
-            }
+                this.migrateData(); }
         } else {
             // Fallback to localStorage if Firebase not initialized
             this.data = this.loadFromLocalStorageFallback();
@@ -246,9 +245,8 @@ const ReportApp = {
             if (saved) {
                 localData = JSON.parse(saved);
             }
-        } catch (e) {
-            console.error("Erro ao carregar do localStorage unificado:", e);
-        }
+        } catch (e) { 
+            console.error("Erro ao carregar do localStorage unificado:", e); }
         
         // 2. Read and merge individual operation keys (newer optimized format)
         const operations = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari", "Patrimônio"];
@@ -258,9 +256,8 @@ const ReportApp = {
                 if (opSaved) {
                     localData[op] = JSON.parse(opSaved);
                 }
-            } catch (e) {
-                console.error(`Erro ao carregar filial ${op} do localStorage:`, e);
-            }
+            } catch (e) { 
+                console.error(`Erro ao carregar filial ${op} do localStorage:`, e); }
         }
         
         return localData;
@@ -296,18 +293,18 @@ const ReportApp = {
         
         const saveFn = () => {
             // 1. Save to Firebase
-            if (window.firebaseDB && this.data[opToSave]) {
+            if (window.firebaseDB && this.data[opToSave]) { try {
                 const opRef = window.firebaseDB.ref('simas_report_data/' + opToSave);
                 if (saveFullOp) {
                     console.log(`[Firebase] Salvando filial completa para persistência global: ${opToSave}`);
                     const dataToSave = JSON.parse(JSON.stringify(this.data[opToSave]));
-                    opRef.set(dataToSave);
+                    opRef.set(dataToSave).catch(e => console.warn('Firebase fail'));
                 } else {
                     console.log(`[Firebase] Salvando alterações ativas da filial ${opToSave} (${dateYMD})`);
                     
                     // Daily node for current date
                     if (this.data[opToSave].daily && this.data[opToSave].daily[dateYMD]) {
-                        opRef.child('daily/' + dateYMD).set(this.data[opToSave].daily[dateYMD]);
+                        opRef.child('daily/' + dateYMD).set(this.data[opToSave].daily[dateYMD]).catch(e => console.warn('Firebase fail'));
                     }
                     
                     // Monthly node for current month
@@ -317,14 +314,14 @@ const ReportApp = {
                     const y = yEl ? parseInt(yEl.value) : new Date().getFullYear();
                     const monthKey = `${y}-${(m + 1).toString().padStart(2, '0')}`;
                     if (this.data[opToSave].monthly && this.data[opToSave].monthly[monthKey]) {
-                        opRef.child('monthly/' + monthKey).set(this.data[opToSave].monthly[monthKey]);
+                        opRef.child('monthly/' + monthKey).set(this.data[opToSave].monthly[monthKey]).catch(e => console.warn('Firebase fail'));
                     }
                     
                     // Global node
                     if (this.data[opToSave].global) {
-                        opRef.child('global').set(this.data[opToSave].global);
+                        opRef.child('global').set(this.data[opToSave].global).catch(e => console.warn('Firebase fail'));
                     }
-                }
+                } } catch(fe) { console.warn("Firebase Error", fe); }
             }
             
             // 2. Save to localStorage
@@ -335,10 +332,9 @@ const ReportApp = {
                 }
                 // Save global key as fallback (if it fails due to size limit, individual key remains safe)
                 localStorage.setItem('simas_report_data', JSON.stringify(this.data));
-            } catch (e) {
+            } catch (e) { 
                 console.error("Erro ao salvar no localStorage (limite excedido?):", e);
-                alert("ATENÇÃO CRÍTICA: O limite de memória do seu navegador foi atingido (Muitas imagens carregadas no histórico). O salvamento local falhou e você pode perder o histórico atual. Por favor, apague imagens de relatórios antigos no painel 'Histórico' para liberar espaço!");
-            }
+                console.warn("Limite de memoria atingido"); }
         };
 
         if (forceImmediate) {
@@ -358,7 +354,7 @@ const ReportApp = {
 
     changeDate: function () {
         this.saveData(true, true);
-        this.currentDateYMD = document.getElementById('reportDatePicker').value;
+        this.currentDateYMD = document.getElementById('reportDatePicker')?.value;
 
         // Update display
         const [yStr, mStr, dStr] = this.currentDateYMD.split('-');
@@ -721,7 +717,7 @@ const ReportApp = {
 
             this.updateWaterChart();
 
-        } catch (e) { console.error("Render failed:", e); }
+        } catch (e) {  console.error("Render failed:", e); }
     },
 
     // Helper to set values safely
@@ -739,7 +735,7 @@ const ReportApp = {
         card.className = 'safety-chart-card';
         card.style.cssText = 'background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); position: relative; display: flex; flex-direction: column; overflow: hidden; min-height: 480px;';
 
-        const mIdx = parseInt(document.getElementById('safetyMonth').value) || 0;
+        const mIdx = parseInt(document.getElementById('safetyMonth')?.value) || 0;
         let hVal = (data.monthlyHours && data.monthlyHours[mIdx]) ? data.monthlyHours[mIdx] : 0;
         let cVal = (data.monthlyChecklist && data.monthlyChecklist[mIdx]) ? data.monthlyChecklist[mIdx] : 0;
 
@@ -862,12 +858,12 @@ const ReportApp = {
                                 <td style="padding: 3px 4px; font-weight: 800; color: #64748b;">${m}</td>
                                 <td style="padding: 2px;">
                                     <input type="number" id="fk_h_his_${index}_${mIdxLoop}" value="${data.monthlyHours[mIdxLoop] || 0}" 
-                                        oninput="ReportApp.updateForkliftCharts(); if(${mIdxLoop}===${mIdx}) document.getElementById('fk_hours_${index}').value = this.value;"
+                                        oninput="ReportApp.updateForkliftCharts(); if(${mIdxLoop}===${mIdx}) if(document.getElementById('fk_hours_${index}')) document.getElementById('fk_hours_${index}').value = this.value;"
                                         style="width: 100%; border: 1px solid #e2e8f0; border-radius: 2px; text-align: center; padding: 2px; font-weight: 700;">
                                 </td>
                                 <td style="padding: 2px;">
                                     <input type="number" id="fk_c_his_${index}_${mIdxLoop}" value="${data.monthlyChecklist[mIdxLoop] || 0}" 
-                                        oninput="ReportApp.updateForkliftCharts(); if(${mIdxLoop}===${mIdx}) document.getElementById('fk_check_${index}').value = this.value;"
+                                        oninput="ReportApp.updateForkliftCharts(); if(${mIdxLoop}===${mIdx}) if(document.getElementById('fk_check_${index}')) document.getElementById('fk_check_${index}').value = this.value;"
                                         style="width: 100%; border: 1px solid #e2e8f0; border-radius: 2px; text-align: center; padding: 2px; font-weight: 700;">
                                 </td>
                             </tr>
@@ -1227,7 +1223,7 @@ const ReportApp = {
 
 
     updateForkliftCharts: function () {
-        const mIdx = parseInt(document.getElementById('safetyMonth').value) || 0;
+        const mIdx = parseInt(document.getElementById('safetyMonth')?.value) || 0;
         const labels = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
         const opData = this.data[this.currentOp];
         const forklifts = opData?.global?.forklifts;
@@ -1356,10 +1352,10 @@ const ReportApp = {
     updateWaterChart: function () {
         const labels = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'];
         const values = [
-            parseFloat(document.getElementById('water_w1').value) || 0,
-            parseFloat(document.getElementById('water_w2').value) || 0,
-            parseFloat(document.getElementById('water_w3').value) || 0,
-            parseFloat(document.getElementById('water_w4').value) || 0
+            parseFloat(document.getElementById('water_w1')?.value) || 0,
+            parseFloat(document.getElementById('water_w2')?.value) || 0,
+            parseFloat(document.getElementById('water_w3')?.value) || 0,
+            parseFloat(document.getElementById('water_w4')?.value) || 0
         ];
 
         const canvas = document.getElementById('waterChart');
@@ -1627,9 +1623,9 @@ const ReportApp = {
     },
 
     updateComplaintsStatusChart: function () {
-        const open = parseFloat(document.getElementById('comp_status_open').value) || 0;
-        const closed = parseFloat(document.getElementById('comp_status_closed').value) || 0;
-        const invalid = parseFloat(document.getElementById('comp_status_invalid').value) || 0;
+        const open = parseFloat(document.getElementById('comp_status_open')?.value) || 0;
+        const closed = parseFloat(document.getElementById('comp_status_closed')?.value) || 0;
+        const invalid = parseFloat(document.getElementById('comp_status_invalid')?.value) || 0;
 
         const canvas = document.getElementById('complaintsStatusChart');
         if (!canvas) return;
@@ -1683,8 +1679,8 @@ const ReportApp = {
         const dqValues = [];
 
         for (let i = 0; i < 12; i++) {
-            ncValues.push(parseFloat(document.getElementById(`nc_val_${i}`).value) || 0);
-            dqValues.push(parseFloat(document.getElementById(`dq_val_${i}`).value) || 0);
+            ncValues.push(parseFloat(document.getElementById(`nc_val_${i}`)?.value) || 0);
+            dqValues.push(parseFloat(document.getElementById(`dq_val_${i}`)?.value) || 0);
         }
 
         const createBarChart = (canvasId, label, data, instanceKey, color) => {
@@ -1799,10 +1795,10 @@ const ReportApp = {
             }
         };
 
-        const ncOpen = parseFloat(document.getElementById('nc_status_open').value) || 0;
-        const ncClosed = parseFloat(document.getElementById('nc_status_closed').value) || 0;
-        const dqOpen = parseFloat(document.getElementById('dq_status_open').value) || 0;
-        const dqClosed = parseFloat(document.getElementById('dq_status_closed').value) || 0;
+        const ncOpen = parseFloat(document.getElementById('nc_status_open')?.value) || 0;
+        const ncClosed = parseFloat(document.getElementById('nc_status_closed')?.value) || 0;
+        const dqOpen = parseFloat(document.getElementById('dq_status_open')?.value) || 0;
+        const dqClosed = parseFloat(document.getElementById('dq_status_closed')?.value) || 0;
 
         createDoughnut('ncStatusChart', ncOpen, ncClosed, 'ncStatusChartInstance', '#18385a', '#2c6a9e');
         createDoughnut('dqStatusChart', dqOpen, dqClosed, 'dqStatusChartInstance', '#18385a', '#2c6a9e');
@@ -1816,8 +1812,8 @@ const ReportApp = {
 
     updateTrainingCharts: function () {
         const labels = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
-        const progValues = Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_prog_${i}`).value) || 0);
-        const realValues = Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_real_${i}`).value) || 0);
+        const progValues = Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_prog_${i}`)?.value) || 0);
+        const realValues = Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_real_${i}`)?.value) || 0);
 
         // 1. Line + Bar Chart (Prog x Real)
         const canvas = document.getElementById('trainingChart');
@@ -1899,9 +1895,9 @@ const ReportApp = {
         if (objCanvas) {
             const ctxObj = objCanvas.getContext('2d');
             const objData = [
-                parseFloat(document.getElementById('train_obj_dev').value) || 0,
-                parseFloat(document.getElementById('train_obj_rec').value) || 0,
-                parseFloat(document.getElementById('train_obj_hom').value) || 0
+                parseFloat(document.getElementById('train_obj_dev')?.value) || 0,
+                parseFloat(document.getElementById('train_obj_rec')?.value) || 0,
+                parseFloat(document.getElementById('train_obj_hom')?.value) || 0
             ];
 
             if (this.trainingObjChartInstance) {
@@ -1954,9 +1950,9 @@ const ReportApp = {
         if (modCanvas) {
             const ctxMod = modCanvas.getContext('2d');
             const modData = [
-                parseFloat(document.getElementById('train_mod_ead').value) || 0,
-                parseFloat(document.getElementById('train_mod_ext').value) || 0,
-                parseFloat(document.getElementById('train_mod_pres').value) || 0
+                parseFloat(document.getElementById('train_mod_ead')?.value) || 0,
+                parseFloat(document.getElementById('train_mod_ext')?.value) || 0,
+                parseFloat(document.getElementById('train_mod_pres')?.value) || 0
             ];
 
             if (this.trainingModChartInstance) {
@@ -2057,9 +2053,9 @@ const ReportApp = {
         const global = op.global;
 
         // --- GLOBAL (Persistent) ---
-        global.manager = document.getElementById('managerName').value;
-        global.area = document.getElementById('areaName').value;
-        global.version = document.getElementById('reportVersion').value;
+        global.manager = document.getElementById('managerName')?.value;
+        global.area = document.getElementById('areaName')?.value;
+        global.version = document.getElementById('reportVersion')?.value;
 
         // Persistência global dos indicadores de segurança da filial
         if (!global.safety) global.safety = {};
@@ -2092,7 +2088,7 @@ const ReportApp = {
         if (safetyIndicatorEl) global.safetyIndicator = safetyIndicatorEl.value;
 
         // Forklifts
-        const mIdx = parseInt(document.getElementById('safetyMonth').value) || 0;
+        const mIdx = parseInt(document.getElementById('safetyMonth')?.value) || 0;
         global.forklifts = (global.forklifts || []).map((fk, i) => {
             const seriesEl = document.getElementById(`fk_series_${i}`);
             if (!seriesEl) return fk;
@@ -2119,9 +2115,9 @@ const ReportApp = {
                 monthlyHours: [...fk.monthlyHours],
                 monthlyChecklist: [...fk.monthlyChecklist],
                 maint: {
-                    last: parseFloat(document.getElementById(`maint_last_${i}`).value) || 0,
-                    now: parseFloat(document.getElementById(`maint_now_${i}`).value) || 0,
-                    next: parseFloat(document.getElementById(`maint_next_${i}`).value) || 0
+                    last: parseFloat(document.getElementById(`maint_last_${i}`)?.value) || 0,
+                    now: parseFloat(document.getElementById(`maint_now_${i}`)?.value) || 0,
+                    next: parseFloat(document.getElementById(`maint_next_${i}`)?.value) || 0
                 }
             };
         });
@@ -2129,45 +2125,45 @@ const ReportApp = {
         // NC & Training (Global arrays)
         if (!global.qm) global.qm = {};
         global.qm.nonConformities = {
-            nc: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`nc_val_${i}`).value) || 0),
-            dq: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`dq_val_${i}`).value) || 0),
+            nc: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`nc_val_${i}`)?.value) || 0),
+            dq: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`dq_val_${i}`)?.value) || 0),
             ncStatus: {
-                open: parseFloat(document.getElementById('nc_status_open').value) || 0,
-                closed: parseFloat(document.getElementById('nc_status_closed').value) || 0
+                open: parseFloat(document.getElementById('nc_status_open')?.value) || 0,
+                closed: parseFloat(document.getElementById('nc_status_closed')?.value) || 0
             },
             dqStatus: {
-                open: parseFloat(document.getElementById('dq_status_open').value) || 0,
-                closed: parseFloat(document.getElementById('dq_status_closed').value) || 0
+                open: parseFloat(document.getElementById('dq_status_open')?.value) || 0,
+                closed: parseFloat(document.getElementById('dq_status_closed')?.value) || 0
             }
         };
 
         if (!global.trainings) global.trainings = {};
         global.trainings = {
-            monthlyProg: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_prog_${i}`).value) || 0),
-            monthlyReal: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_real_${i}`).value) || 0),
+            monthlyProg: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_prog_${i}`)?.value) || 0),
+            monthlyReal: Array.from({ length: 12 }, (_, i) => parseFloat(document.getElementById(`tr_real_${i}`)?.value) || 0),
             kpi: {
-                prog: parseFloat(document.getElementById('train_prog').value) || 0,
-                real: parseFloat(document.getElementById('train_real').value) || 0,
-                atras: parseFloat(document.getElementById('train_atras').value) || 0
+                prog: parseFloat(document.getElementById('train_prog')?.value) || 0,
+                real: parseFloat(document.getElementById('train_real')?.value) || 0,
+                atras: parseFloat(document.getElementById('train_atras')?.value) || 0
             },
             objective: {
-                dev: parseFloat(document.getElementById('train_obj_dev').value) || 0,
-                rec: parseFloat(document.getElementById('train_obj_rec').value) || 0,
-                hom: parseFloat(document.getElementById('train_obj_hom').value) || 0
+                dev: parseFloat(document.getElementById('train_obj_dev')?.value) || 0,
+                rec: parseFloat(document.getElementById('train_obj_rec')?.value) || 0,
+                hom: parseFloat(document.getElementById('train_obj_hom')?.value) || 0
             },
             modality: {
-                ead: parseFloat(document.getElementById('train_mod_ead').value) || 0,
-                ext: parseFloat(document.getElementById('train_mod_ext').value) || 0,
-                pres: parseFloat(document.getElementById('train_mod_pres').value) || 0
+                ead: parseFloat(document.getElementById('train_mod_ead')?.value) || 0,
+                ext: parseFloat(document.getElementById('train_mod_ext')?.value) || 0,
+                pres: parseFloat(document.getElementById('train_mod_pres')?.value) || 0
             }
         };
 
         // Top 3
         global.top3 = Array.from({ length: 3 }, (_, i) => ({
-            desc: document.getElementById(`prob_desc_${i}`).value,
-            crit: document.getElementById(`prob_crit_${i}`).value,
-            resp: document.getElementById(`prob_resp_${i}`).value,
-            evol: parseFloat(document.getElementById(`prob_evol_${i}`).value) || 0
+            desc: document.getElementById(`prob_desc_${i}`)?.value,
+            crit: document.getElementById(`prob_crit_${i}`)?.value,
+            resp: document.getElementById(`prob_resp_${i}`)?.value,
+            evol: parseFloat(document.getElementById(`prob_evol_${i}`)?.value) || 0
         }));
 
         // Bird Pyramid
@@ -2198,29 +2194,29 @@ const ReportApp = {
             op.monthly[this.currentWaterMonthKey] = {};
         }
         op.monthly[this.currentWaterMonthKey].forkliftWater = [
-            parseFloat(document.getElementById('water_w1').value) || 0,
-            parseFloat(document.getElementById('water_w2').value) || 0,
-            parseFloat(document.getElementById('water_w3').value) || 0,
-            parseFloat(document.getElementById('water_w4').value) || 0
+            parseFloat(document.getElementById('water_w1')?.value) || 0,
+            parseFloat(document.getElementById('water_w2')?.value) || 0,
+            parseFloat(document.getElementById('water_w3')?.value) || 0,
+            parseFloat(document.getElementById('water_w4')?.value) || 0
         ];
 
         qmMonthly.qm = {
-            reclamacoes: document.getElementById('qm_reclamacoes').value,
-            solucionadas: document.getElementById('qm_solucionadas').value,
-            nao_solucionadas: document.getElementById('qm_nao_solucionadas').value,
+            reclamacoes: document.getElementById('qm_reclamacoes')?.value,
+            solucionadas: document.getElementById('qm_solucionadas')?.value,
+            nao_solucionadas: document.getElementById('qm_nao_solucionadas')?.value,
             complaints: Array.from({ length: 5 }, (_, i) => ({
-                type: document.getElementById(`comp_type_${i}`).value,
-                qty: parseFloat(document.getElementById(`comp_qty_${i}`).value) || 0
+                type: document.getElementById(`comp_type_${i}`)?.value,
+                qty: parseFloat(document.getElementById(`comp_qty_${i}`)?.value) || 0
             })),
             complaintsStatus: {
-                open: parseFloat(document.getElementById('comp_status_open').value) || 0,
-                closed: parseFloat(document.getElementById('comp_status_closed').value) || 0,
-                invalid: parseFloat(document.getElementById('comp_status_invalid').value) || 0
+                open: parseFloat(document.getElementById('comp_status_open')?.value) || 0,
+                closed: parseFloat(document.getElementById('comp_status_closed')?.value) || 0,
+                invalid: parseFloat(document.getElementById('comp_status_invalid')?.value) || 0
             }
         };
 
         // --- DAILY (Resets by day) ---
-        daily.intro = document.getElementById('introText').value;
+        daily.intro = document.getElementById('introText')?.value;
         if (!daily.safety) daily.safety = {};
         Object.assign(daily.safety, {
             status: document.getElementById('safetyStatus')?.value || 'sem_acidente',
@@ -2237,26 +2233,26 @@ const ReportApp = {
         });
 
         daily.donoRua = {
-            names: Array.from({ length: 5 }, (_, i) => document.getElementById(`dono_name_${i}`).value),
-            scores: Array.from({ length: 5 }, (_, i) => parseFloat(document.getElementById(`dono_score_${i}`).value) || 0)
+            names: Array.from({ length: 5 }, (_, i) => document.getElementById(`dono_name_${i}`)?.value),
+            scores: Array.from({ length: 5 }, (_, i) => parseFloat(document.getElementById(`dono_score_${i}`)?.value) || 0)
         };
 
         daily.galpao = {
-            insatisfatorio: parseInt(document.getElementById('galpao_insatisfatorio').value) || 0,
-            toleravel: parseInt(document.getElementById('galpao_toleravel').value) || 0,
-            satisfatorio: parseInt(document.getElementById('galpao_satisfatorio').value) || 0
+            insatisfatorio: parseInt(document.getElementById('galpao_insatisfatorio')?.value) || 0,
+            toleravel: parseInt(document.getElementById('galpao_toleravel')?.value) || 0,
+            satisfatorio: parseInt(document.getElementById('galpao_satisfatorio')?.value) || 0
         };
 
         daily.performance = {
             best: {
-                name: document.getElementById('perf_best_name').value,
-                score: parseInt(document.getElementById('perf_best_score').value) || 0,
-                gender: document.getElementById('perf_best_gender').value
+                name: document.getElementById('perf_best_name')?.value,
+                score: parseInt(document.getElementById('perf_best_score')?.value) || 0,
+                gender: document.getElementById('perf_best_gender')?.value
             },
             worst: {
-                name: document.getElementById('perf_worst_name').value,
-                score: parseInt(document.getElementById('perf_worst_score').value) || 0,
-                gender: document.getElementById('perf_worst_gender').value
+                name: document.getElementById('perf_worst_name')?.value,
+                score: parseInt(document.getElementById('perf_worst_score')?.value) || 0,
+                gender: document.getElementById('perf_worst_gender')?.value
             }
         };
     },
@@ -2289,7 +2285,7 @@ const ReportApp = {
     },
 
     renderHistoryList: function () {
-        const filterMonth = document.getElementById('historyMonthFilter').value; // YYYY-MM
+        const filterMonth = document.getElementById('historyMonthFilter')?.value; // YYYY-MM
         const container = document.getElementById('historyList');
         const op = this.data[this.currentOp];
         if (!op || !op.daily) {
@@ -2331,7 +2327,7 @@ const ReportApp = {
                     this.deleteHistory(dateYMD);
                     return;
                 }
-                document.getElementById('reportDatePicker').value = dateYMD;
+                if(document.getElementById('reportDatePicker')) document.getElementById('reportDatePicker').value = dateYMD;
                 this.toggleHistoryPanel();
                 this.changeDate();
             };
@@ -2491,9 +2487,8 @@ const ReportApp = {
                     grid.appendChild(cell);
                 });
             });
-        } catch (err) {
-            console.error("Error rendering safety cross:", err);
-        }
+        } catch (err) { 
+            console.error("Error rendering safety cross:", err); }
     },
 
 
@@ -3070,9 +3065,8 @@ const ReportApp = {
                 }
             }, 100);
 
-        } catch (err) {
-            console.error("Error adding LUP:", err);
-        }
+        } catch (err) { 
+            console.error("Error adding LUP:", err); }
     },
 
     removeLup: function (idx) {
@@ -3114,10 +3108,9 @@ const ReportApp = {
                 op.daily[dateYMD].lups[idx][field] = compressedBase64;
                 this.renderLupCards();
                 this.saveData(true);
-            } catch (err) {
+            } catch (err) { 
                 console.error("Erro ao processar imagem da LUP:", err);
-                alert("Erro ao processar imagem.");
-            }
+                alert("Erro ao processar imagem."); }
         }
     },
 
@@ -3242,9 +3235,8 @@ const ReportApp = {
                 }
             }, 100);
 
-        } catch (err) {
-            console.error("Error adding Melhoria:", err);
-        }
+        } catch (err) { 
+            console.error("Error adding Melhoria:", err); }
     },
 
     removeMelhoria: function (idx) {
@@ -3279,17 +3271,16 @@ const ReportApp = {
                 op.daily[dateYMD].melhorias[idx][field] = compressedBase64;
                 this.renderMelhoriaCards();
                 this.saveData(true, true);
-            } catch (err) {
+            } catch (err) { 
                 console.error("Erro ao processar imagem da melhoria:", err);
-                alert("Erro ao processar imagem.");
-            }
+                alert("Erro ao processar imagem."); }
         }
     },
 
     toggleCrossDay: function (day) {
         const op = this.data[this.currentOp];
-        const m = parseInt(document.getElementById('safetyMonth').value);
-        const y = parseInt(document.getElementById('safetyYear').value);
+        const m = parseInt(document.getElementById('safetyMonth')?.value);
+        const y = parseInt(document.getElementById('safetyYear')?.value);
         const monthKey = `${y}-${(m + 1).toString().padStart(2, '0')}`;
 
         if (!op.monthly[monthKey]) op.monthly[monthKey] = {};
@@ -3325,10 +3316,9 @@ const ReportApp = {
             op.daily[dateYMD].safety.images[index] = compressedBase64;
             this.saveData(true, true);
             this.render();
-        } catch (err) {
+        } catch (err) { 
             console.error("Erro ao processar imagem de segurança:", err);
-            alert("Erro ao processar imagem.");
-        }
+            alert("Erro ao processar imagem."); }
     },
 
     _prepareForExport: function(element) {
@@ -3568,7 +3558,7 @@ const ReportApp = {
         if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     },
 
-    compressBase64Image: function (base64Str, maxWidth = 1000, maxHeight = 1000, quality = 0.7) {
+    compressBase64Image: function (base64Str, maxWidth = 600, maxHeight = 600, quality = 0.5) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
@@ -3602,7 +3592,7 @@ const ReportApp = {
         });
     },
 
-    compressImage: function (file, maxWidth = 1000, maxHeight = 1000, quality = 0.7) {
+    compressImage: function (file, maxWidth = 600, maxHeight = 600, quality = 0.5) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -3634,9 +3624,8 @@ const ReportApp = {
                                 console.log(`Comprimindo imagem antiga de Segurança da filial ${opName} em ${dateYMD}...`);
                                 daily.safety.images[i] = await this.compressBase64Image(img);
                                 migrated = true;
-                            } catch (e) {
-                                console.error("Erro migrando imagem de segurança:", e);
-                            }
+                            } catch (e) { 
+                                console.error("Erro migrando imagem de segurança:", e); }
                         }
                     }
                 }
@@ -3650,18 +3639,16 @@ const ReportApp = {
                                 console.log(`Comprimindo imagem antiga do Desvio de LUP #${i+1} da filial ${opName} em ${dateYMD}...`);
                                 lup.imgErrado = await this.compressBase64Image(lup.imgErrado);
                                 migrated = true;
-                            } catch (e) {
-                                console.error("Erro migrando imgErrado de LUP:", e);
-                            }
+                            } catch (e) { 
+                                console.error("Erro migrando imgErrado de LUP:", e); }
                         }
                         if (lup.imgCerto && lup.imgCerto.startsWith('data:image/') && lup.imgCerto.length > 250000) {
                             try {
                                 console.log(`Comprimindo imagem antiga do Padrão de LUP #${i+1} da filial ${opName} em ${dateYMD}...`);
                                 lup.imgCerto = await this.compressBase64Image(lup.imgCerto);
                                 migrated = true;
-                            } catch (e) {
-                                console.error("Erro migrando imgCerto de LUP:", e);
-                            }
+                            } catch (e) { 
+                                console.error("Erro migrando imgCerto de LUP:", e); }
                         }
                     }
                 }
@@ -3675,18 +3662,16 @@ const ReportApp = {
                                 console.log(`Comprimindo imagem antiga de Melhoria Antes #${i+1} da filial ${opName} em ${dateYMD}...`);
                                 m.imgAntes = await this.compressBase64Image(m.imgAntes);
                                 migrated = true;
-                            } catch (e) {
-                                console.error("Erro migrando imgAntes de Melhoria:", e);
-                            }
+                            } catch (e) { 
+                                console.error("Erro migrando imgAntes de Melhoria:", e); }
                         }
                         if (m.imgDepois && m.imgDepois.startsWith('data:image/') && m.imgDepois.length > 250000) {
                             try {
                                 console.log(`Comprimindo imagem antiga de Melhoria Depois #${i+1} da filial ${opName} em ${dateYMD}...`);
                                 m.imgDepois = await this.compressBase64Image(m.imgDepois);
                                 migrated = true;
-                            } catch (e) {
-                                console.error("Erro migrando imgDepois de Melhoria:", e);
-                            }
+                            } catch (e) { 
+                                console.error("Erro migrando imgDepois de Melhoria:", e); }
                         }
                     }
                 }
