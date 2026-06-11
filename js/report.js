@@ -176,7 +176,7 @@ const ReportApp = {
         const paramOp = urlParams.get('op');
         if (paramOp) {
             // Case-insensitive match for predefined operations
-            const ops = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari"];
+            const ops = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari", "Patrimônio"];
             const match = ops.find(o => o.toLowerCase() === paramOp.toLowerCase());
             this.currentOp = match || paramOp;
         } else {
@@ -251,7 +251,7 @@ const ReportApp = {
         }
         
         // 2. Read and merge individual operation keys (newer optimized format)
-        const operations = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari"];
+        const operations = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari", "Patrimônio"];
         for (let op of operations) {
             try {
                 const opSaved = localStorage.getItem('simas_report_data_' + op);
@@ -337,6 +337,7 @@ const ReportApp = {
                 localStorage.setItem('simas_report_data', JSON.stringify(this.data));
             } catch (e) {
                 console.error("Erro ao salvar no localStorage (limite excedido?):", e);
+                alert("ATENÇÃO CRÍTICA: O limite de memória do seu navegador foi atingido (Muitas imagens carregadas no histórico). O salvamento local falhou e você pode perder o histórico atual. Por favor, apague imagens de relatórios antigos no painel 'Histórico' para liberar espaço!");
             }
         };
 
@@ -360,11 +361,19 @@ const ReportApp = {
         this.currentDateYMD = document.getElementById('reportDatePicker').value;
 
         // Update display
-        const [y, m, d] = this.currentDateYMD.split('-');
-        if (document.getElementById('currentDate')) document.getElementById('currentDate').textContent = `${d}/${m}/${y}`;
-        if (document.getElementById('yearDisplay')) document.getElementById('yearDisplay').textContent = y;
+        const [yStr, mStr, dStr] = this.currentDateYMD.split('-');
+        if (document.getElementById('currentDate')) document.getElementById('currentDate').textContent = `${dStr}/${mStr}/${yStr}`;
+        if (document.getElementById('yearDisplay')) document.getElementById('yearDisplay').textContent = yStr;
         const cpEl = document.getElementById('currentDatePaper');
-        if (cpEl) cpEl.textContent = `${d}/${m}/${y}`;
+        if (cpEl) cpEl.textContent = `${dStr}/${mStr}/${yStr}`;
+
+        // Automatically sync the safety/water dropdowns to match the history date's month and year
+        const safetyMonthEl = document.getElementById('safetyMonth');
+        const safetyYearEl = document.getElementById('safetyYear');
+        if (safetyMonthEl && safetyYearEl) {
+            safetyMonthEl.value = (parseInt(mStr, 10) - 1).toString();
+            safetyYearEl.value = yStr;
+        }
 
         this.render();
     },
@@ -381,7 +390,10 @@ const ReportApp = {
 
         const op = this.data[opName];
         const monthKey = dateYMD.slice(0, 7);
-        const combined = JSON.parse(JSON.stringify(op.global));
+        const combined = JSON.parse(JSON.stringify(op.global || {}));
+
+        if (!combined.qm) combined.qm = {};
+        if (!combined.safety) combined.safety = {};
 
         // Apply Monthly Overrides
         if (op.monthly && op.monthly[monthKey]) {
@@ -397,19 +409,32 @@ const ReportApp = {
         }
 
         // Apply Daily Overrides
-        if (!combined.safety) combined.safety = {};
         if (op.daily && op.daily[dateYMD]) {
-            Object.assign(combined, op.daily[dateYMD]);
-            if (op.daily[dateYMD].safety) {
+            const dailyData = op.daily[dateYMD];
+            for (let key in dailyData) {
+                if (key === 'safety') {
+                    Object.assign(combined.safety, dailyData.safety);
+                } else if (key === 'donoRua') {
+                    if (!combined.donoRua) combined.donoRua = {};
+                    Object.assign(combined.donoRua, dailyData.donoRua);
+                } else if (key === 'lup') {
+                    if (!combined.lup) combined.lup = [];
+                    combined.lup = dailyData.lup;
+                } else if (key === 'qm') {
+                    Object.assign(combined.qm, dailyData.qm);
+                } else {
+                    combined[key] = dailyData[key];
+                }
+            }
+            if (dailyData.safety) {
                 // Sincroniza apenas as propriedades específicas do dia, mantendo os indicadores globais da filial
-                const dailySafety = op.daily[dateYMD].safety;
-                combined.safety.status = dailySafety.status || 'sem_acidente';
-                combined.safety.images = dailySafety.images || ['', '', ''];
-                combined.safety.sc_open = dailySafety.sc_open || '0';
-                combined.safety.sc_closed = dailySafety.sc_closed || '0';
-                combined.safety.sc_rejected = dailySafety.sc_rejected || '0';
-                combined.safety.sc_total = dailySafety.sc_total || '0';
-                combined.safety.obs = dailySafety.obs || '';
+                combined.safety.status = dailyData.safety.status || 'sem_acidente';
+                combined.safety.images = dailyData.safety.images || ['', '', ''];
+                combined.safety.sc_open = dailyData.safety.sc_open || '0';
+                combined.safety.sc_closed = dailyData.safety.sc_closed || '0';
+                combined.safety.sc_rejected = dailyData.safety.sc_rejected || '0';
+                combined.safety.sc_total = dailyData.safety.sc_total || '0';
+                combined.safety.obs = dailyData.safety.obs || '';
             }
         } else {
             // Day Resets (Mantém os indicadores globais da filial intocados)
@@ -970,7 +995,7 @@ const ReportApp = {
         let totalTrain = 0;
 
         // Iterate over keys found in data, or default operation list
-        const operations = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari"];
+        const operations = ["Matriz", "Funeas", "Sorocaba", "São Roque", "Prefeitura SJP", "Camaçari", "Patrimônio"];
 
         operations.forEach(op => {
             const opCombined = this.getDataForOp(op);
@@ -1004,7 +1029,6 @@ const ReportApp = {
     },
 
     calculateSafetyDays: function () {
-        // Garantir "zerado" absoluto em caso de erros:
         const startDate = new Date(2026, 0, 1);
 
         const reportDateStr = document.getElementById('reportDatePicker')?.value;
@@ -1023,19 +1047,24 @@ const ReportApp = {
 
         const msPerDay = 1000 * 60 * 60 * 24;
         let currentDays = 0;
-        let recordDays = 0;
 
         if (lastAccidentDate && lastAccidentDate <= reportDate) {
             currentDays = Math.round((reportDate - lastAccidentDate) / msPerDay);
-            const previousPeriod = Math.round((lastAccidentDate - startDate) / msPerDay);
-            recordDays = Math.max(previousPeriod, currentDays, 0);
         } else {
             currentDays = Math.round((reportDate - startDate) / msPerDay);
-            recordDays = currentDays;
         }
 
         if (currentDays < 0) currentDays = 0;
-        if (recordDays < 0) recordDays = 0;
+
+        // Recupera o recorde existente do DOM
+        const recInput = document.getElementById('safetyRecord');
+        let recordDays = recInput ? parseInt(recInput.value, 10) : 0;
+        if (isNaN(recordDays)) recordDays = 0;
+
+        // Bateu o recorde?
+        if (currentDays > recordDays) {
+            recordDays = currentDays;
+        }
 
         // Displays
         const recDisplay = document.getElementById('safetyRecord_display');
@@ -1043,10 +1072,8 @@ const ReportApp = {
         if (recDisplay) recDisplay.textContent = recordDays;
         if (curDisplay) curDisplay.textContent = currentDays;
 
-        // Hidden fields required for original saving pipeline
-        const recHidden = document.getElementById('safetyRecord');
+        if (recInput) recInput.value = recordDays;
         const curHidden = document.getElementById('safetyCurrent');
-        if (recHidden) recHidden.value = recordDays;
         if (curHidden) curHidden.value = currentDays;
     },
 
@@ -2478,19 +2505,33 @@ const ReportApp = {
             const preview = document.getElementById(`preview-${idx}`);
             const placeholder = document.getElementById(`placeholder-${idx}`);
             const card = document.getElementById(`card-${idx}`);
+            const delBtn = document.getElementById(`del-img-${idx}`);
 
             if (imgSrc) {
                 preview.src = imgSrc;
                 preview.style.display = 'block';
                 placeholder.style.display = 'none';
                 card.style.borderStyle = 'solid';
+                if (delBtn) delBtn.style.display = 'flex';
             } else {
                 preview.src = '';
                 preview.style.display = 'none';
                 placeholder.style.display = 'flex';
                 card.style.borderStyle = 'dashed';
+                if (delBtn) delBtn.style.display = 'none';
             }
         });
+    },
+
+    removeSafetyImage: function (index) {
+        if (!confirm('Deseja realmente apagar esta imagem do cartão de segurança?')) return;
+        const op = this.data[this.currentOp];
+        const dateYMD = this.currentDateYMD;
+        if (op && op.daily && op.daily[dateYMD] && op.daily[dateYMD].safety && op.daily[dateYMD].safety.images) {
+            op.daily[dateYMD].safety.images[index] = '';
+            this.saveData(true, true);
+            this.render();
+        }
     },
 
     openLightbox: function (index) {
@@ -3290,6 +3331,153 @@ const ReportApp = {
         }
     },
 
+    _prepareForExport: function(element) {
+        window.scrollTo(0, 0);
+        const inputs = element.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            if (input.tagName === 'SELECT') {
+                for (let i = 0; i < input.options.length; i++) {
+                    if (input.options[i].selected) input.options[i].setAttribute('selected', 'selected');
+                    else input.options[i].removeAttribute('selected');
+                }
+            } else if (input.tagName === 'TEXTAREA') {
+                input.innerHTML = input.value;
+            } else if (input.type === 'radio' || input.type === 'checkbox') {
+                if (input.checked) input.setAttribute('checked', 'checked');
+                else input.removeAttribute('checked');
+            } else {
+                input.setAttribute('value', input.value);
+            }
+        });
+    },
+
+    downloadOnePagePDF: function () {
+        const element = document.getElementById('reportElement');
+        this._prepareForExport(element);
+
+        // Calculate dynamic dimensions to fit exactly on one page without cutting
+        const opt = {
+            margin: [5, 5, 5, 5],
+            filename: `${this.currentFilial} - ${this.currentDate}.pdf`,
+            image: { type: 'jpeg', quality: 1.0 },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                letterRendering: true, 
+                backgroundColor: '#f1f5f9',
+                scrollY: 0
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+
+        const controlBar = document.querySelector('.report-control-bar');
+        if(controlBar) controlBar.style.display = 'none';
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            if(controlBar) controlBar.style.display = 'flex';
+        }).catch(err => {
+            console.error(err);
+            alert("Erro ao gerar o PDF. " + err);
+            if(controlBar) controlBar.style.display = 'flex';
+        });
+    },
+
+    downloadOnePageImage: function () {
+        const element = document.getElementById('reportElement');
+        this._prepareForExport(element);
+        
+        const controlBar = document.querySelector('.report-control-bar');
+        if(controlBar) controlBar.style.display = 'none';
+
+        html2canvas(element, { 
+            scale: 2, 
+            useCORS: true, 
+            backgroundColor: '#f1f5f9',
+            scrollY: 0
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `${this.currentFilial} - ${this.currentDate}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
+            link.click();
+            
+            if(controlBar) controlBar.style.display = 'flex';
+        }).catch(err => {
+            console.error(err);
+            alert("Erro ao gerar a imagem. " + err);
+            if(controlBar) controlBar.style.display = 'flex';
+        });
+    },
+
+        toggleBreakPreview: function() {
+        const element = document.getElementById('reportElement');
+        const existingLines = element.querySelectorAll('.preview-break-line');
+        if (existingLines.length > 0) {
+            existingLines.forEach(l => l.remove());
+            return;
+        }
+        
+        const width = element.offsetWidth;
+        const pageHeight = width / (277 / 190);
+        const totalHeight = element.offsetHeight;
+        
+        let currentY = pageHeight;
+        let pageNum = 1;
+        
+        element.style.position = 'relative';
+
+        while (currentY < totalHeight) {
+            const line = document.createElement('div');
+            line.className = 'preview-break-line';
+            line.style.top = `${currentY}px`;
+            
+            const label = document.createElement('div');
+            label.className = 'preview-break-label';
+            label.innerText = `Fim da Página ${pageNum} (Tesoura)`;
+            line.appendChild(label);
+            
+            element.appendChild(line);
+            currentY += pageHeight;
+            pageNum++;
+        }
+        alert("Modo de Pré-visualização ativado! As linhas vermelhas pontilhadas estimam onde a página vai quebrar. O 'PDF Profissional' vai empurrar os cards inteiros para a próxima página automaticamente se a tesoura cortar no meio.");
+    },
+
+    downloadProfessionalPDF: function () {
+        const element = document.getElementById('reportElement');
+        this._prepareForExport(element);
+
+        const existingLines = element.querySelectorAll('.preview-break-line');
+        existingLines.forEach(l => l.style.display = 'none');
+
+        const opt = {
+            margin: [10, 10, 10, 10],
+            filename: `${this.currentFilial} - ${this.currentDate} (Profissional).pdf`,
+            image: { type: 'jpeg', quality: 1.0 },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true, 
+                letterRendering: true, 
+                backgroundColor: '#f1f5f9',
+                scrollY: 0
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+            pagebreak: { mode: ['css', 'legacy'] }
+        };
+
+        const controlBar = document.querySelector('.report-control-bar');
+        if(controlBar) controlBar.style.display = 'none';
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            if(controlBar) controlBar.style.display = 'flex';
+            existingLines.forEach(l => l.style.display = 'block');
+        }).catch(err => {
+            console.error(err);
+            alert("Erro ao gerar o PDF Profissional. " + err);
+            if(controlBar) controlBar.style.display = 'flex';
+            existingLines.forEach(l => l.style.display = 'block');
+        });
+    },
+
     toggleSafetyGeneralPanel: function () {
         const panel = document.getElementById('safetyGeneralPanel');
         if (panel) {
@@ -3300,6 +3488,52 @@ const ReportApp = {
                 this.saveData(true, true); // Immediate save to Firebase & LocalStorage
             }
         }
+    },
+
+    downloadPDF: function () {
+        const reportElement = document.querySelector('.report-paper');
+        if (!reportElement) return;
+
+        // Esconde a barra de controle para ela não sair no PDF
+        const controls = document.querySelector('.report-control-bar');
+        const oldDisplay = controls ? controls.style.display : '';
+        if (controls) controls.style.display = 'none';
+
+        // Garante que o texto digitado nos textareas apareça no html2canvas/pdf
+        const textareas = reportElement.querySelectorAll('textarea');
+        textareas.forEach(t => { t.textContent = t.value; });
+
+        // Garante que inputs numéricos e textos também mantenham seus valores
+        const inputs = reportElement.querySelectorAll('input:not([type="hidden"]):not([type="file"])');
+        inputs.forEach(i => { i.setAttribute('value', i.value); });
+
+        // Verifica se a biblioteca foi carregada
+        if (typeof html2pdf === 'undefined') {
+            alert("A biblioteca de PDF ainda está carregando, tente novamente em alguns segundos.");
+            if (controls) controls.style.display = oldDisplay;
+            return;
+        }
+
+        const originalTransform = reportElement.style.transform;
+        reportElement.style.transform = 'none'; // Fix possible scaling issues
+
+        const opt = {
+            margin:       [0.2, 0.2, 0.2, 0.2],
+            filename:     `SIMAS_OnePage_${this.currentOp}_${this.currentDateYMD}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, logging: false },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(reportElement).save().then(() => {
+            if (controls) controls.style.display = oldDisplay;
+            reportElement.style.transform = originalTransform;
+        }).catch(err => {
+            console.error('Erro ao gerar o PDF:', err);
+            if (controls) controls.style.display = oldDisplay;
+            reportElement.style.transform = originalTransform;
+            alert('Erro ao gerar o PDF.');
+        });
     },
 
     toggleSafetyCardsPanel: function () {
