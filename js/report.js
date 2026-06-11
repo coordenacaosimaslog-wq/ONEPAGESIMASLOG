@@ -2566,16 +2566,16 @@ const ReportApp = {
         const singleImg = document.getElementById('lightboxImg');
         const lupContainer = document.getElementById('lightboxLupContainer');
         const imgDesvio = document.getElementById('lightboxLupDesvio');
-        const imgPadrao = document.getElementById('lightboxLupPadrao');
+        const imgPadrao = (document.getElementById('lightboxLupPadrao') || document.getElementById('lightboxLupPadrão'));
 
-        document.querySelector('#lightboxLupContainer > div:nth-child(1) h3').innerText = 'DESVIO';
-        document.querySelector('#lightboxLupContainer > div:nth-child(2) h3').innerText = 'PADRÃO';
+        var h1 = document.querySelector('#lightboxLupContainer > div:nth-child(1) h3'); if(h1) h1.innerText = 'DESVIO';
+        var h2 = document.querySelector('#lightboxLupContainer > div:nth-child(2) h3'); if(h2) h2.innerText = 'PADRÃO';
 
-        singleImg.style.display = 'none';
-        lupContainer.style.display = 'flex';
+        if(singleImg) singleImg.style.display = 'none';
+        if(lupContainer) lupContainer.style.display = 'flex';
 
-        imgDesvio.src = lup.imgErrado || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
-        imgPadrao.src = lup.imgCerto || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+        if(imgDesvio) imgDesvio.src = lup.imgErrado || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+        if(imgPadrao) imgPadrao.src = lup.imgCerto || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
 
         modal.style.display = 'block';
     },
@@ -2592,16 +2592,16 @@ const ReportApp = {
         const singleImg = document.getElementById('lightboxImg');
         const lupContainer = document.getElementById('lightboxLupContainer');
         const imgDesvio = document.getElementById('lightboxLupDesvio');
-        const imgPadrao = document.getElementById('lightboxLupPadrao');
+        const imgPadrao = (document.getElementById('lightboxLupPadrao') || document.getElementById('lightboxLupPadrão'));
 
-        document.querySelector('#lightboxLupContainer > div:nth-child(1) h3').innerText = 'ANTES';
-        document.querySelector('#lightboxLupContainer > div:nth-child(2) h3').innerText = 'DEPOIS';
+        var h1 = document.querySelector('#lightboxLupContainer > div:nth-child(1) h3'); if(h1) h1.innerText = 'ANTES';
+        var h2 = document.querySelector('#lightboxLupContainer > div:nth-child(2) h3'); if(h2) h2.innerText = 'DEPOIS';
 
-        singleImg.style.display = 'none';
-        lupContainer.style.display = 'flex';
+        if(singleImg) singleImg.style.display = 'none';
+        if(lupContainer) lupContainer.style.display = 'flex';
 
-        imgDesvio.src = m.imgAntes || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
-        imgPadrao.src = m.imgDepois || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+        if(imgDesvio) imgDesvio.src = m.imgAntes || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
+        if(imgPadrao) imgPadrao.src = m.imgDepois || 'https://placehold.co/400x300/f8fafc/cbd5e1?text=SEM+IMAGEM';
 
         modal.style.display = 'block';
     },
