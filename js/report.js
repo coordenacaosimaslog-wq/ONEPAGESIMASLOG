@@ -1038,7 +1038,10 @@ const ReportApp = {
         let lastAccidentDate = null;
         if (lastAccidentStr) {
             const [y, m, d] = lastAccidentStr.split('-');
-            lastAccidentDate = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+            const yearVal = parseInt(y, 10);
+            if (yearVal > 1900) {
+                lastAccidentDate = new Date(yearVal, parseInt(m, 10) - 1, parseInt(d, 10));
+            }
         }
 
         const msPerDay = 1000 * 60 * 60 * 24;
