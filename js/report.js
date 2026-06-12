@@ -2047,6 +2047,7 @@ const ReportApp = {
         if (!op.daily[dateYMD]) op.daily[dateYMD] = {};
         if (!op.monthly) op.monthly = {};
         if (!op.monthly[monthKey]) op.monthly[monthKey] = {};
+        if (!op.global) op.global = {};
 
         const daily = op.daily[dateYMD];
         const monthly = op.monthly[monthKey];
