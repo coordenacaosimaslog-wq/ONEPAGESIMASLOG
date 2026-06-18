@@ -287,6 +287,16 @@
             </div>
         </div>
 
+        <div style="margin-top: 40px; display: flex; gap: 10px; justify-content: center; width: 100%;">
+            <button onclick="exportData()" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                <i class="fas fa-download"></i> Exportar Dados (Backup)
+            </button>
+            <label style="background: rgba(22, 163, 74, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                <i class="fas fa-upload"></i> Importar Backup
+                <input type="file" id="importFile" style="display: none;" accept=".json" onchange="importData(event)">
+            </label>
+        </div>
+
         <div class="footer">
             &copy; 2026 Simas Logística. Todos os direitos reservados.
         </div>
@@ -321,6 +331,39 @@
             setTimeout(() => {
                 window.location.href = targetUrl;
             }, 200);
+        }
+
+        function exportData() {
+            const data = localStorage.getItem('simas_report_data');
+            if (!data) {
+                alert('Nenhum dado encontrado para exportar.');
+                return;
+            }
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `simas_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const content = e.target.result;
+                    JSON.parse(content); // Valida se é JSON
+                    localStorage.setItem('simas_report_data', content);
+                    alert('Dados importados com sucesso! O sistema foi restaurado.');
+                    window.location.reload();
+                } catch(err) {
+                    alert('Erro ao importar arquivo. Certifique-se de que é o arquivo de backup correto.');
+                }
+            };
+            reader.readAsText(file);
         }
     </script>
 </body>
