@@ -1982,7 +1982,7 @@
                         style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
                         <!-- Card 1 -->
                         <div class="safety-upload-card" id="card-0" onclick="ReportApp.triggerUpload(0)"
-                            style="aspect-ratio: 16/9;">
+                            style="aspect-ratio: 16/9; position: relative;">
                             <input type="file" id="file-0" accept="image/*" style="display: none;"
                                 onchange="ReportApp.handleImageUpload(event, 0)">
                             <div class="upload-placeholder" id="placeholder-0">
@@ -1991,10 +1991,11 @@
                             </div>
                             <img id="preview-0" class="image-preview" src="" style="display: none;"
                                 onclick="event.stopPropagation(); ReportApp.openLightbox(0)">
+                            <button id="del-img-0" onclick="event.stopPropagation(); ReportApp.removeSafetyImage(0)" style="display: none; position: absolute; top: 8px; right: 8px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.2s;" onmouseover="this.style.transform='scale(1.1)'; this.style.background='#dc2626';" onmouseout="this.style.transform='scale(1)'; this.style.background='#ef4444';" title="Excluir Imagem"><i class="fas fa-trash-alt" style="font-size: 12px;"></i></button>
                         </div>
                         <!-- Card 2 -->
                         <div class="safety-upload-card" id="card-1" onclick="ReportApp.triggerUpload(1)"
-                            style="aspect-ratio: 16/9;">
+                            style="aspect-ratio: 16/9; position: relative;">
                             <input type="file" id="file-1" accept="image/*" style="display: none;"
                                 onchange="ReportApp.handleImageUpload(event, 1)">
                             <div class="upload-placeholder" id="placeholder-1">
@@ -2003,10 +2004,11 @@
                             </div>
                             <img id="preview-1" class="image-preview" src="" style="display: none;"
                                 onclick="event.stopPropagation(); ReportApp.openLightbox(1)">
+                            <button id="del-img-1" onclick="event.stopPropagation(); ReportApp.removeSafetyImage(1)" style="display: none; position: absolute; top: 8px; right: 8px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.2s;" onmouseover="this.style.transform='scale(1.1)'; this.style.background='#dc2626';" onmouseout="this.style.transform='scale(1)'; this.style.background='#ef4444';" title="Excluir Imagem"><i class="fas fa-trash-alt" style="font-size: 12px;"></i></button>
                         </div>
                         <!-- Card 3 -->
                         <div class="safety-upload-card" id="card-2" onclick="ReportApp.triggerUpload(2)"
-                            style="aspect-ratio: 16/9;">
+                            style="aspect-ratio: 16/9; position: relative;">
                             <input type="file" id="file-2" accept="image/*" style="display: none;"
                                 onchange="ReportApp.handleImageUpload(event, 2)">
                             <div class="upload-placeholder" id="placeholder-2">
@@ -2015,6 +2017,7 @@
                             </div>
                             <img id="preview-2" class="image-preview" src="" style="display: none;"
                                 onclick="event.stopPropagation(); ReportApp.openLightbox(2)">
+                            <button id="del-img-2" onclick="event.stopPropagation(); ReportApp.removeSafetyImage(2)" style="display: none; position: absolute; top: 8px; right: 8px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.3); transition: all 0.2s;" onmouseover="this.style.transform='scale(1.1)'; this.style.background='#dc2626';" onmouseout="this.style.transform='scale(1)'; this.style.background='#ef4444';" title="Excluir Imagem"><i class="fas fa-trash-alt" style="font-size: 12px;"></i></button>
                         </div>
                     </div>
                 </div>
@@ -3676,7 +3679,7 @@
     </script>
     
     <!-- Scripts -->
-    <script src="js/report.js?v=1781795393"></script>
+    <script src="js/report.js?v=1782134123"></script>
     <script>
         function updateRowStatusColor(selectEl) {
             const val = selectEl.value;

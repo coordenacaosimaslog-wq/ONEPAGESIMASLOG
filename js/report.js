@@ -1307,11 +1307,11 @@ const ReportApp = {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        layout: { padding: { top: 20 } },
+                        layout: { padding: { top: 25, bottom: 0 } },
                         plugins: {
                             legend: {
                                 display: true,
-                                position: 'top',
+                                position: 'bottom',
                                 labels: { boxWidth: 10, font: { size: 8, weight: 'bold' } }
                             },
                             datalabels: {
