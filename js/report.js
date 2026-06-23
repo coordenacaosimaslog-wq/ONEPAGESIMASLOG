@@ -1483,9 +1483,12 @@ const ReportApp = {
         }
 
         const percentEl = document.getElementById(`maintPercent_${index}`);
-        if (percentEl) percentEl.textContent = Math.round(percent) + '%';
+        if (percentEl) {
+            percentEl.textContent = Math.round(percent) + '%';
+            percentEl.style.color = percent >= 80 ? '#dc2626' : '#1e3a8a';
+        }
 
-        let color = '#023e8a'; // Institutional blue for maintenance charts
+        let color = percent >= 80 ? '#dc2626' : '#023e8a'; // Red if >= 80%, else institutional blue
 
         const canvas = document.getElementById(`maintChart_${index}`);
         if (!canvas) return;
@@ -1497,7 +1500,32 @@ const ReportApp = {
             this.maintChartInstances[index].update();
         } else {
             this.maintChartInstances[index] = new Chart(ctx, {
-                plugins: [ChartDataLabels],
+                plugins: [ChartDataLabels, {
+                    id: 'gaugeLine',
+                    afterDatasetDraw: function(chart, args, options) {
+                        const meta = chart.getDatasetMeta(0);
+                        if (!meta.data || meta.data.length === 0) return;
+                        const arc = meta.data[0];
+                        const cx = arc.x;
+                        const cy = arc.y;
+                        const outerRadius = arc.outerRadius;
+                        const innerRadius = arc.innerRadius;
+                        
+                        // arc.startAngle represents the beginning of the gauge (0%)
+                        const startAngle = arc.startAngle;
+                        // 80% of a half circle (Math.PI) is Math.PI * 0.8
+                        const angle = startAngle + (Math.PI * 0.8);
+                        
+                        chart.ctx.save();
+                        chart.ctx.beginPath();
+                        chart.ctx.moveTo(cx + Math.cos(angle) * innerRadius, cy + Math.sin(angle) * innerRadius);
+                        chart.ctx.lineTo(cx + Math.cos(angle) * outerRadius, cy + Math.sin(angle) * outerRadius);
+                        chart.ctx.strokeStyle = '#dc2626'; // Red threshold line
+                        chart.ctx.lineWidth = 2;
+                        chart.ctx.stroke();
+                        chart.ctx.restore();
+                    }
+                }],
                 type: 'doughnut',
                 data: {
                     datasets: [{
