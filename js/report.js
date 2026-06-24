@@ -422,6 +422,7 @@ const ReportApp = {
                     combined[key] = dailyData[key];
                 }
             }
+            
             if (dailyData.safety) {
                 // Sincroniza apenas as propriedades específicas do dia, mantendo os indicadores globais da filial
                 combined.safety.status = dailyData.safety.status || 'sem_acidente';
@@ -443,6 +444,17 @@ const ReportApp = {
             combined.safety.sc_total = '0';
             combined.donoRua = { names: ['', '', '', '', ''], scores: [0, 0, 0, 0, 0] };
         }
+
+        // Inherit licenses history per day
+        if (!op.daily || !op.daily[dateYMD] || !op.daily[dateYMD].licenses) {
+            if (op.daily) {
+                const pastDates = Object.keys(op.daily).filter(d => d < dateYMD && op.daily[d].licenses).sort().reverse();
+                if (pastDates.length > 0) {
+                    combined.licenses = JSON.parse(JSON.stringify(op.daily[pastDates[0]].licenses));
+                }
+            }
+        }
+
         return combined;
     },
 
@@ -931,18 +943,24 @@ const ReportApp = {
         }
     },
 
-    addLicense: function() {
+    addLicense: function () {
         // Sync DOM inputs first to preserve any unsaved typing
         this.gatherDataFromDOM();
 
         if (!this.data[this.currentOp]) {
             this.data[this.currentOp] = { global: JSON.parse(JSON.stringify(this.defaultTemplate)), daily: {}, monthly: {} };
         }
-        const opGlobal = this.data[this.currentOp].global;
-        if (!opGlobal.licenses) {
-            opGlobal.licenses = Array(4).fill({ name: '', date: '', status: 'regular' });
+        
+        if (!this.data[this.currentOp].daily) this.data[this.currentOp].daily = {};
+        if (!this.data[this.currentOp].daily[this.currentDateYMD]) this.data[this.currentOp].daily[this.currentDateYMD] = {};
+        
+        const daily = this.data[this.currentOp].daily[this.currentDateYMD];
+        if (!daily.licenses) {
+            const opData = this.getDataForOp(this.currentOp, this.currentDateYMD);
+            daily.licenses = JSON.parse(JSON.stringify(opData.licenses || []));
         }
-        opGlobal.licenses.push({ name: '', date: '', status: 'regular' });
+        
+        daily.licenses.push({ name: '', date: '', status: 'regular' });
         
         // Save directly to bypass redundant/buggy gatherDataFromDOM on obsolete elements
         this.saveToLocalStorage(true, true);
@@ -955,9 +973,17 @@ const ReportApp = {
         // Sync DOM inputs first to preserve any unsaved typing
         this.gatherDataFromDOM();
 
-        const opGlobal = this.data[this.currentOp].global;
-        if (opGlobal && opGlobal.licenses) {
-            opGlobal.licenses.splice(index, 1);
+        if (!this.data[this.currentOp].daily) this.data[this.currentOp].daily = {};
+        if (!this.data[this.currentOp].daily[this.currentDateYMD]) this.data[this.currentOp].daily[this.currentDateYMD] = {};
+
+        const daily = this.data[this.currentOp].daily[this.currentDateYMD];
+        if (!daily.licenses) {
+            const opData = this.getDataForOp(this.currentOp, this.currentDateYMD);
+            daily.licenses = JSON.parse(JSON.stringify(opData.licenses || []));
+        }
+
+        if (daily && daily.licenses) {
+            daily.licenses.splice(index, 1);
             
             // Save directly to bypass gatherDataFromDOM reading from obsolete DOM elements before rendering
             this.saveToLocalStorage(true, true);
@@ -2099,17 +2125,7 @@ const ReportApp = {
             last_accident_date: document.getElementById('safetyLastAccident')?.value || ''
         });
 
-        global.licenses = (global.licenses || []).map((lic, i) => {
-            const nameEl = document.getElementById(`lic_name_${i}`);
-            if (!nameEl) return lic; // Preserva licenças recém-adicionadas que ainda não foram renderizadas
-            const dateEl = document.getElementById(`lic_date_${i}`);
-            const statusEl = document.getElementById(`lic_status_${i}`);
-            return {
-                name: nameEl.value,
-                date: dateEl ? dateEl.value : lic.date,
-                status: statusEl ? statusEl.value : lic.status
-            };
-        });
+
         global.licenseBadges = {
             critical: document.getElementById('lic_badge_critical')?.value || '2 Críticas',
             alert: document.getElementById('lic_badge_alert')?.value || '1 Alerta',
@@ -2248,6 +2264,21 @@ const ReportApp = {
         };
 
         // --- DAILY (Resets by day) ---
+        // Inherit base licenses to map
+        const opData = this.getDataForOp(this.currentOp, this.currentDateYMD);
+        const baseLicenses = daily.licenses || opData.licenses || global.licenses || [];
+        daily.licenses = baseLicenses.map((lic, i) => {
+            const nameEl = document.getElementById(`lic_name_${i}`);
+            if (!nameEl) return lic; // Preserva licenças recém-adicionadas
+            const dateEl = document.getElementById(`lic_date_${i}`);
+            const statusEl = document.getElementById(`lic_status_${i}`);
+            return {
+                name: nameEl.value,
+                date: dateEl ? dateEl.value : lic.date,
+                status: statusEl ? statusEl.value : lic.status
+            };
+        });
+
         daily.intro = document.getElementById('introText')?.value;
         if (!daily.safety) daily.safety = {};
         Object.assign(daily.safety, {
